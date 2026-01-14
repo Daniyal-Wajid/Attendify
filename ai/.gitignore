@@ -1,0 +1,42 @@
+# Ignore ML model checkpoints and weights
+*.pt
+*.pth
+*.onnx
+*.h5
+*.weights
+*.tflite
+*.pb
+
+# Large numpy arrays and serialized data
+*.npy
+encodings.npy
+
+# Data folders (raw datasets, extracted frames)
+dataset/
+frames/
+uploads/
+outputs/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*.so
+venv/
+env/
+.venv/
+envs/
+
+# Logs and runtime files
+logs/
+*.log
+
+# VSCode/IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+.cache/

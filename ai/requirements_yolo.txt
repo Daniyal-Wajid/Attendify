@@ -1,0 +1,20 @@
+# Requirements for YOLOv8-face and ArcFace Recognition
+# Install with: pip install -r requirements_yolo.txt
+
+# YOLOv8 for face detection
+ultralytics>=8.0.0
+
+# DeepFace for ArcFace embeddings
+deepface>=0.0.89
+
+# Core dependencies (usually already installed with OpenCV)
+opencv-python>=4.5.0
+numpy>=1.21.0
+
+# Optional: For better face alignment
+# retinaface>=0.0.15  # Alternative face detector with better alignment
+# insightface>=0.7.3  # For advanced face recognition
+
+# Visualization
+matplotlib>=3.5.0  # Optional, for plotting if needed
+
