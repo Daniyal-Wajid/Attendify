@@ -24,8 +24,8 @@ dotenv.config();
 const app = express();
 app.use(cors());
 // Increase JSON body parser limit to handle large image data (base64 encoded images can be large)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 /* -------------------- FFmpeg Setup -------------------- */
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -61,8 +61,8 @@ function convertToMp4(inputPath) {
     console.log(`Converting video: ${inputPath} → ${outputPath}`);
 
     ffmpeg(inputPath)
-      .videoCodec('libx264')
-      .audioCodec('aac')
+      .videoCodec("libx264")
+      .audioCodec("aac")
       .output(outputPath)
       .on("start", (commandLine) => {
         console.log(`FFmpeg command: ${commandLine}`);
@@ -119,17 +119,21 @@ const authenticate = async (req, res, next) => {
     }
 
     // Simple token validation - in production use JWT
-    const user = await User.findById(token).populate("studentId").populate("assignedSubjects");
+    const user = await User.findById(token)
+      .populate("studentId")
+      .populate("assignedSubjects");
     if (!user) {
       return res.status(401).json({ error: "Invalid token - user not found" });
     }
-    
+
     req.user = user;
     next();
   } catch (err) {
     console.error("Authentication error:", err);
     // Always return JSON, never HTML
-    return res.status(401).json({ error: "Authentication failed", details: err.message });
+    return res
+      .status(401)
+      .json({ error: "Authentication failed", details: err.message });
   }
 };
 
@@ -165,7 +169,9 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
     }
 
     if (!req.file) {
@@ -179,7 +185,9 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
       if (fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      return res.status(400).json({ error: "Student with this email already registered" });
+      return res
+        .status(400)
+        .json({ error: "Student with this email already registered" });
     }
 
     // Check if roll number already exists
@@ -189,7 +197,9 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
       if (fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
       }
-      return res.status(400).json({ error: "Student with this roll number already exists" });
+      return res
+        .status(400)
+        .json({ error: "Student with this roll number already exists" });
     }
 
     // Check if user account already exists
@@ -208,7 +218,7 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
     const uploadedExt = path.extname(uploadedPath).toLowerCase();
 
     // 1️⃣ Convert video to mp4 if needed (handles .webm, .mp4, .mov, .avi, etc.)
-    if (uploadedExt === '.mp4' && originalExt === '.mp4') {
+    if (uploadedExt === ".mp4" && originalExt === ".mp4") {
       // Already mp4, use as-is
       mp4Path = uploadedPath;
       console.log(`✅ Video is already MP4 format: ${mp4Path}`);
@@ -222,7 +232,9 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
           fs.unlinkSync(uploadedPath);
           console.log(`🗑️ Removed original file: ${uploadedPath}`);
         } catch (cleanupErr) {
-          console.warn(`⚠️ Could not remove original file: ${cleanupErr.message}`);
+          console.warn(
+            `⚠️ Could not remove original file: ${cleanupErr.message}`,
+          );
         }
       }
     }
@@ -252,20 +264,31 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
     // Training can take a long time (processing 65 frames with YOLOv8-face + ArcFace)
     // Set timeout to 5 minutes (300000ms) - training is async, so this won't block the response
     axios
-      .post("http://127.0.0.1:8000/train", {
-        studentId: student._id.toString(),
-        framesDir: framesDir,
-      }, {
-        timeout: 300000, // 5 minutes timeout for training (YOLOv8-face + ArcFace can be slow)
-      })
+      .post(
+        "http://127.0.0.1:8000/train",
+        {
+          studentId: student._id.toString(),
+          framesDir: framesDir,
+        },
+        {
+          timeout: 300000, // 5 minutes timeout for training (YOLOv8-face + ArcFace can be slow)
+        },
+      )
       .then(() => {
-        console.log(`✅ AI training completed for student: ${student.name} (${student._id})`);
+        console.log(
+          `✅ AI training completed for student: ${student.name} (${student._id})`,
+        );
       })
       .catch((err) => {
-        if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-          console.error(`⚠️ AI training timed out for student ${student._id} - training may still be in progress`);
+        if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
+          console.error(
+            `⚠️ AI training timed out for student ${student._id} - training may still be in progress`,
+          );
         } else {
-          console.error(`⚠️ AI training failed for student ${student._id}:`, err.message);
+          console.error(
+            `⚠️ AI training failed for student ${student._id}:`,
+            err.message,
+          );
         }
       });
 
@@ -280,7 +303,7 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
     });
   } catch (err) {
     console.error("Student registration error:", err);
-    
+
     // Clean up uploaded file on error
     if (req.file && fs.existsSync(req.file.path)) {
       try {
@@ -289,8 +312,10 @@ app.post("/api/students/register", upload.single("video"), async (req, res) => {
         console.error("Error cleaning up file:", cleanupErr);
       }
     }
-    
-    res.status(500).json({ error: err.message || "Failed to register student" });
+
+    res
+      .status(500)
+      .json({ error: err.message || "Failed to register student" });
   }
 });
 
@@ -299,7 +324,7 @@ app.post("/api/teachers/register", authenticate, async (req, res) => {
   try {
     console.log("Teacher registration request:", {
       userRole: req.user?.role,
-      body: { ...req.body, password: "[HIDDEN]" }
+      body: { ...req.body, password: "[HIDDEN]" },
     });
 
     if (!req.user || req.user.role !== "admin") {
@@ -309,13 +334,17 @@ app.post("/api/teachers/register", authenticate, async (req, res) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "All fields (name, email, password) are required" });
+      return res
+        .status(400)
+        .json({ error: "All fields (name, email, password) are required" });
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: "User with this email already exists" });
+      return res
+        .status(400)
+        .json({ error: "User with this email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -335,9 +364,9 @@ app.post("/api/teachers/register", authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error("Teacher registration error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       error: err.message || "Failed to register teacher",
-      details: process.env.NODE_ENV === "development" ? err.stack : undefined
+      details: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });
   }
 });
@@ -358,7 +387,9 @@ app.post("/api/admins/register", authenticate, async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: "User with this email already exists" });
+      return res
+        .status(400)
+        .json({ error: "User with this email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -395,40 +426,44 @@ app.get("/api/teachers", authenticate, async (req, res) => {
 });
 
 /* -------------------- Assign Subjects to Teacher (Admin only) -------------------- */
-app.put("/api/teachers/:teacherId/assign-subjects", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin only" });
+app.put(
+  "/api/teachers/:teacherId/assign-subjects",
+  authenticate,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "admin") {
+        return res.status(403).json({ error: "Admin only" });
+      }
+
+      const { teacherId } = req.params;
+      const { subjectIds } = req.body;
+
+      if (!Array.isArray(subjectIds)) {
+        return res.status(400).json({ error: "subjectIds must be an array" });
+      }
+
+      const teacher = await User.findById(teacherId);
+      if (!teacher || teacher.role !== "teacher") {
+        return res.status(404).json({ error: "Teacher not found" });
+      }
+
+      teacher.assignedSubjects = subjectIds;
+      await teacher.save();
+
+      const updatedTeacher = await User.findById(teacherId)
+        .select("-password")
+        .populate("assignedSubjects");
+
+      res.json({
+        message: "Subjects assigned successfully",
+        teacher: updatedTeacher,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
     }
-
-    const { teacherId } = req.params;
-    const { subjectIds } = req.body;
-
-    if (!Array.isArray(subjectIds)) {
-      return res.status(400).json({ error: "subjectIds must be an array" });
-    }
-
-    const teacher = await User.findById(teacherId);
-    if (!teacher || teacher.role !== "teacher") {
-      return res.status(404).json({ error: "Teacher not found" });
-    }
-
-    teacher.assignedSubjects = subjectIds;
-    await teacher.save();
-
-    const updatedTeacher = await User.findById(teacherId)
-      .select("-password")
-      .populate("assignedSubjects");
-
-    res.json({
-      message: "Subjects assigned successfully",
-      teacher: updatedTeacher,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  },
+);
 
 /* -------------------- Get Teacher's Assigned Subjects -------------------- */
 app.get("/api/teachers/my-subjects", authenticate, async (req, res) => {
@@ -454,7 +489,9 @@ app.get("/api/teachers/attendance", authenticate, async (req, res) => {
       return res.status(403).json({ error: "Teacher only" });
     }
 
-    const teacher = await User.findById(req.user._id).populate("assignedSubjects");
+    const teacher = await User.findById(req.user._id).populate(
+      "assignedSubjects",
+    );
     const subjectIds = teacher.assignedSubjects.map((subj) => subj._id);
 
     if (subjectIds.length === 0) {
@@ -511,11 +548,13 @@ app.get("/api/students", authenticate, async (req, res) => {
       query.$or = [
         { name: searchRegex },
         { rollNumber: searchRegex },
-        { email: searchRegex }
+        { email: searchRegex },
       ];
     }
 
-    const students = await Student.find(query).select("-videoPath").sort({ name: 1 });
+    const students = await Student.find(query)
+      .select("-videoPath")
+      .sort({ name: 1 });
     res.json(students);
   } catch (err) {
     console.error("Get students error:", err);
@@ -524,42 +563,53 @@ app.get("/api/students", authenticate, async (req, res) => {
 });
 
 /* -------------------- Reset Student Password (Admin only) -------------------- */
-app.put("/api/students/:studentId/reset-password", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin only" });
+app.put(
+  "/api/students/:studentId/reset-password",
+  authenticate,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "admin") {
+        return res.status(403).json({ error: "Admin only" });
+      }
+
+      const { studentId } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        return res
+          .status(400)
+          .json({ error: "Password must be at least 6 characters" });
+      }
+
+      // Find student
+      const student = await Student.findById(studentId);
+      if (!student) {
+        return res.status(404).json({ error: "Student not found" });
+      }
+
+      // Find user account associated with student
+      const user = await User.findOne({
+        studentId: studentId,
+        role: "student",
+      });
+      if (!user) {
+        return res
+          .status(404)
+          .json({ error: "Student user account not found" });
+      }
+
+      // Hash and update password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+      await user.save();
+
+      res.json({ message: "Student password reset successfully" });
+    } catch (err) {
+      console.error("Reset student password error:", err);
+      res.status(500).json({ error: err.message });
     }
-
-    const { studentId } = req.params;
-    const { newPassword } = req.body;
-
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
-    }
-
-    // Find student
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ error: "Student not found" });
-    }
-
-    // Find user account associated with student
-    const user = await User.findOne({ studentId: studentId, role: "student" });
-    if (!user) {
-      return res.status(404).json({ error: "Student user account not found" });
-    }
-
-    // Hash and update password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    await user.save();
-
-    res.json({ message: "Student password reset successfully" });
-  } catch (err) {
-    console.error("Reset student password error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  },
+);
 
 /* -------------------- Delete Student (Admin only) -------------------- */
 app.delete("/api/students/:studentId", authenticate, async (req, res) => {
@@ -588,14 +638,22 @@ app.delete("/api/students/:studentId", authenticate, async (req, res) => {
     }
 
     // Delete all Attendance records for this student
-    const attendanceCount = await Attendance.countDocuments({ student: studentId });
+    const attendanceCount = await Attendance.countDocuments({
+      student: studentId,
+    });
     await Attendance.deleteMany({ student: studentId });
-    console.log(`✓ Deleted ${attendanceCount} attendance records for student ${studentId}`);
+    console.log(
+      `✓ Deleted ${attendanceCount} attendance records for student ${studentId}`,
+    );
 
     // Delete all Enrollment records for this student
-    const enrollmentCount = await Enrollment.countDocuments({ student: studentId });
+    const enrollmentCount = await Enrollment.countDocuments({
+      student: studentId,
+    });
     await Enrollment.deleteMany({ student: studentId });
-    console.log(`✓ Deleted ${enrollmentCount} enrollment records for student ${studentId}`);
+    console.log(
+      `✓ Deleted ${enrollmentCount} enrollment records for student ${studentId}`,
+    );
 
     // Delete video file if it exists
     if (videoPath && fs.existsSync(videoPath)) {
@@ -620,10 +678,12 @@ app.delete("/api/students/:studentId", authenticate, async (req, res) => {
     // Delete student record
     await Student.findByIdAndDelete(studentId);
 
-    console.log(`✓ Student ${studentId} (${student.name}) deleted successfully`);
+    console.log(
+      `✓ Student ${studentId} (${student.name}) deleted successfully`,
+    );
 
-    res.json({ 
-      message: `Student deleted successfully. Removed ${attendanceCount} attendance records and ${enrollmentCount} enrollment records.` 
+    res.json({
+      message: `Student deleted successfully. Removed ${attendanceCount} attendance records and ${enrollmentCount} enrollment records.`,
     });
   } catch (err) {
     console.error("Delete student error:", err);
@@ -632,76 +692,96 @@ app.delete("/api/students/:studentId", authenticate, async (req, res) => {
 });
 
 /* -------------------- Reset Teacher Password (Admin only) -------------------- */
-app.put("/api/teachers/:teacherId/reset-password", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ error: "Admin only" });
+app.put(
+  "/api/teachers/:teacherId/reset-password",
+  authenticate,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "admin") {
+        return res.status(403).json({ error: "Admin only" });
+      }
+
+      const { teacherId } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 6) {
+        return res
+          .status(400)
+          .json({ error: "Password must be at least 6 characters" });
+      }
+
+      // Find teacher user
+      const teacher = await User.findById(teacherId);
+      if (!teacher || teacher.role !== "teacher") {
+        return res.status(404).json({ error: "Teacher not found" });
+      }
+
+      // Hash and update password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      teacher.password = hashedPassword;
+      await teacher.save();
+
+      res.json({ message: "Teacher password reset successfully" });
+    } catch (err) {
+      console.error("Reset teacher password error:", err);
+      res.status(500).json({ error: err.message });
     }
-
-    const { teacherId } = req.params;
-    const { newPassword } = req.body;
-
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
-    }
-
-    // Find teacher user
-    const teacher = await User.findById(teacherId);
-    if (!teacher || teacher.role !== "teacher") {
-      return res.status(404).json({ error: "Teacher not found" });
-    }
-
-    // Hash and update password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    teacher.password = hashedPassword;
-    await teacher.save();
-
-    res.json({ message: "Teacher password reset successfully" });
-  } catch (err) {
-    console.error("Reset teacher password error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  },
+);
 
 /* -------------------- Get Student Attendance by Subject -------------------- */
-app.get("/api/students/:studentId/attendance", authenticate, async (req, res) => {
-  try {
-    const { studentId } = req.params;
-    const attendances = await Attendance.find({ student: studentId })
-      .populate("subject")
-      .sort({ date: -1 });
-    
-    // Group by subject
-    const bySubject = {};
-    attendances.forEach((att) => {
-      const subjName = att.subject?.name || "Unknown";
-      if (!bySubject[subjName]) {
-        bySubject[subjName] = [];
-      }
-      bySubject[subjName].push({
-        date: att.date,
-        markedBy: att.markedBy,
-      });
-    });
+app.get(
+  "/api/students/:studentId/attendance",
+  authenticate,
+  async (req, res) => {
+    try {
+      const { studentId } = req.params;
+      const attendances = await Attendance.find({ student: studentId })
+        .populate("subject")
+        .sort({ date: -1 });
 
-    res.json(bySubject);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+      // Group by subject
+      const bySubject = {};
+      attendances.forEach((att) => {
+        const subjName = att.subject?.name || "Unknown";
+        if (!bySubject[subjName]) {
+          bySubject[subjName] = [];
+        }
+        bySubject[subjName].push({
+          date: att.date,
+          markedBy: att.markedBy,
+        });
+      });
+
+      res.json(bySubject);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
 
 /* -------------------- Mark Attendance -------------------- */
 app.post("/api/attendance/mark", authenticate, async (req, res) => {
   try {
-    const { studentId, subjectId, markedBy = "auto", date, status = "present" } = req.body;
+    const {
+      studentId,
+      subjectId,
+      markedBy = "auto",
+      date,
+      status = "present",
+    } = req.body;
 
     if (!studentId || !subjectId) {
-      return res.status(400).json({ error: "Student ID and Subject ID required" });
+      return res
+        .status(400)
+        .json({ error: "Student ID and Subject ID required" });
     }
 
     // Validate status
     if (!["present", "absent", "leave"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Must be present, absent, or leave" });
+      return res
+        .status(400)
+        .json({ error: "Invalid status. Must be present, absent, or leave" });
     }
 
     // CRITICAL: Check if student is enrolled and approved in this course
@@ -714,12 +794,14 @@ app.post("/api/attendance/mark", authenticate, async (req, res) => {
     });
 
     if (!enrollment) {
-      return res.status(403).json({ 
-        error: "Student is not enrolled or not approved in this course" 
+      return res.status(403).json({
+        error: "Student is not enrolled or not approved in this course",
       });
     }
-    
-    console.log(`✓ Student ${studentId} is enrolled in subject ${subjectId} (with teacher: ${enrollment.teacher})`);
+
+    console.log(
+      `✓ Student ${studentId} is enrolled in subject ${subjectId} (with teacher: ${enrollment.teacher})`,
+    );
 
     // Check if manual attendance is allowed
     if (markedBy === "manual") {
@@ -728,25 +810,33 @@ app.post("/api/attendance/mark", authenticate, async (req, res) => {
         return res.status(403).json({ error: "Manual attendance not allowed" });
       }
       if (req.user.role !== "teacher" && req.user.role !== "admin") {
-        return res.status(403).json({ error: "Only teachers can mark manual attendance" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can mark manual attendance" });
       }
 
       // If teacher, verify they are assigned to this subject
       if (req.user.role === "teacher") {
         const subjectIdStr = subjectId.toString();
-        const teacher = await User.findById(req.user._id).populate("assignedSubjects");
-        const assignedSubjectIds = (teacher.assignedSubjects || []).map(subj => 
-          subj._id?.toString() || subj.toString()
+        const teacher = await User.findById(req.user._id).populate(
+          "assignedSubjects",
         );
-        
-        const isAssigned = assignedSubjectIds.includes(subjectIdStr) || 
-                          (req.user.assignedSubjects || []).some(assignedId => {
-                            const assignedIdStr = assignedId._id?.toString() || assignedId.toString();
-                            return assignedIdStr === subjectIdStr;
-                          });
-        
+        const assignedSubjectIds = (teacher.assignedSubjects || []).map(
+          (subj) => subj._id?.toString() || subj.toString(),
+        );
+
+        const isAssigned =
+          assignedSubjectIds.includes(subjectIdStr) ||
+          (req.user.assignedSubjects || []).some((assignedId) => {
+            const assignedIdStr =
+              assignedId._id?.toString() || assignedId.toString();
+            return assignedIdStr === subjectIdStr;
+          });
+
         if (!isAssigned) {
-          return res.status(403).json({ error: "Not assigned to this subject" });
+          return res
+            .status(403)
+            .json({ error: "Not assigned to this subject" });
         }
       }
     }
@@ -756,10 +846,15 @@ app.post("/api/attendance/mark", authenticate, async (req, res) => {
 
     // Use provided date or current date
     const attendanceDate = date ? new Date(date) : new Date();
-    
+
     // Set time to current time if not provided, or keep the provided date/time
     if (!date) {
-      attendanceDate.setHours(new Date().getHours(), new Date().getMinutes(), 0, 0);
+      attendanceDate.setHours(
+        new Date().getHours(),
+        new Date().getMinutes(),
+        0,
+        0,
+      );
     }
 
     // Check for duplicate: same student, subject, and date (ignoring time)
@@ -780,16 +875,18 @@ app.post("/api/attendance/mark", authenticate, async (req, res) => {
     if (alreadyMarked) {
       if (markedBy === "auto") {
         // Auto-attendance: prevent duplicate - already marked today, don't mark again
-        console.log(`⚠️ Attendance already marked for student ${studentId} in subject ${subjectId} on ${checkDate.toISOString().split('T')[0]}`);
-        return res.json({ 
+        console.log(
+          `⚠️ Attendance already marked for student ${studentId} in subject ${subjectId} on ${checkDate.toISOString().split("T")[0]}`,
+        );
+        return res.json({
           message: "Attendance already marked for this student on this date",
           alreadyMarked: true,
           existingAttendance: {
             _id: alreadyMarked._id,
             date: alreadyMarked.date,
             status: alreadyMarked.status,
-            markedBy: alreadyMarked.markedBy
-          }
+            markedBy: alreadyMarked.markedBy,
+          },
         });
       } else if (markedBy === "manual") {
         // Manual attendance: update the existing record (allows editing previous attendance)
@@ -797,11 +894,13 @@ app.post("/api/attendance/mark", authenticate, async (req, res) => {
         alreadyMarked.markedBy = markedBy; // Update markedBy to manual
         alreadyMarked.date = attendanceDate; // Update date if changed
         await alreadyMarked.save();
-        console.log(`✓ Updated existing attendance for student ${studentId} in subject ${subjectId}`);
-        return res.json({ 
+        console.log(
+          `✓ Updated existing attendance for student ${studentId} in subject ${subjectId}`,
+        );
+        return res.json({
           message: "Attendance updated successfully",
           alreadyMarked: true,
-          attendanceId: alreadyMarked._id
+          attendanceId: alreadyMarked._id,
         });
       }
     }
@@ -815,10 +914,10 @@ app.post("/api/attendance/mark", authenticate, async (req, res) => {
       status: finalStatus,
     });
 
-    res.json({ 
+    res.json({
       message: "Attendance marked successfully",
       attendanceId: newAttendance._id,
-      alreadyMarked: false 
+      alreadyMarked: false,
     });
   } catch (err) {
     console.error("Mark attendance error:", err);
@@ -852,24 +951,30 @@ app.put("/api/attendance/:attendanceId", authenticate, async (req, res) => {
 
     // Teachers can only edit attendance for their assigned subjects
     if (req.user.role === "teacher") {
-      const teacher = await User.findById(req.user._id).populate("assignedSubjects");
+      const teacher = await User.findById(req.user._id).populate(
+        "assignedSubjects",
+      );
       const canEdit = teacher.assignedSubjects.some(
-        (subj) => subj._id.toString() === attendance.subject.toString()
+        (subj) => subj._id.toString() === attendance.subject.toString(),
       );
       if (!canEdit && subjectId) {
         // Check if new subject is assigned
         const canEditNew = teacher.assignedSubjects.some(
-          (subj) => subj._id.toString() === subjectId
+          (subj) => subj._id.toString() === subjectId,
         );
         if (!canEditNew) {
-          return res.status(403).json({ error: "Not authorized to edit this attendance" });
+          return res
+            .status(403)
+            .json({ error: "Not authorized to edit this attendance" });
         }
       }
     }
 
     // Validate status if provided
     if (status && !["present", "absent", "leave"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Must be present, absent, or leave" });
+      return res
+        .status(400)
+        .json({ error: "Invalid status. Must be present, absent, or leave" });
     }
 
     // Update attendance
@@ -904,12 +1009,16 @@ app.delete("/api/attendance/:attendanceId", authenticate, async (req, res) => {
 
     // Teachers can only delete attendance for their assigned subjects
     if (req.user.role === "teacher") {
-      const teacher = await User.findById(req.user._id).populate("assignedSubjects");
+      const teacher = await User.findById(req.user._id).populate(
+        "assignedSubjects",
+      );
       const canDelete = teacher.assignedSubjects.some(
-        (subj) => subj._id.toString() === attendance.subject.toString()
+        (subj) => subj._id.toString() === attendance.subject.toString(),
       );
       if (!canDelete) {
-        return res.status(403).json({ error: "Not authorized to delete this attendance" });
+        return res
+          .status(403)
+          .json({ error: "Not authorized to delete this attendance" });
       }
     }
 
@@ -933,7 +1042,9 @@ app.get("/api/attendance/all", authenticate, async (req, res) => {
 
     // Teachers can only see attendance for their assigned subjects
     if (req.user.role === "teacher") {
-      const teacher = await User.findById(req.user._id).populate("assignedSubjects");
+      const teacher = await User.findById(req.user._id).populate(
+        "assignedSubjects",
+      );
       const subjectIds = teacher.assignedSubjects.map((subj) => subj._id);
       query.subject = { $in: subjectIds };
     }
@@ -975,7 +1086,7 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
     // base64 → buffer
     const buffer = Buffer.from(
       imageBase64.replace(/^data:image\/\w+;base64,/, ""),
-      "base64"
+      "base64",
     );
 
     const formData = new FormData();
@@ -993,21 +1104,21 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
       {
         headers: formData.getHeaders(),
         timeout: 30000, // 30 second timeout (increased from 5s for YOLOv8-face + ArcFace)
-      }
+      },
     );
 
     console.log("AI Recognition response:", {
       recognized: aiRes.data.recognized,
       studentId: aiRes.data.studentId,
-      facesDetected: aiRes.data.faces?.length || 0
+      facesDetected: aiRes.data.faces?.length || 0,
     });
 
     if (!aiRes.data.recognized) {
-      return res.json({ 
-        recognized: false, 
+      return res.json({
+        recognized: false,
         faces: aiRes.data.faces || [],
         student: null,
-        error: aiRes.data.error
+        error: aiRes.data.error,
       });
     }
 
@@ -1015,10 +1126,10 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
     const faceBox = aiRes.data.faceBox;
 
     if (!studentId) {
-      return res.json({ 
-        recognized: false, 
+      return res.json({
+        recognized: false,
         faces: aiRes.data.faces || [],
-        student: null 
+        student: null,
       });
     }
 
@@ -1026,11 +1137,13 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
     const student = await Student.findById(studentId);
     if (!student) {
       console.error(`Student not found for ID: ${studentId}`);
-      console.error(`Available student IDs in labels should match MongoDB ObjectIds`);
-      return res.json({ 
-        recognized: false, 
+      console.error(
+        `Available student IDs in labels should match MongoDB ObjectIds`,
+      );
+      return res.json({
+        recognized: false,
         faces: aiRes.data.faces || [],
-        error: `Student with ID ${studentId} not found in database`
+        error: `Student with ID ${studentId} not found in database`,
       });
     }
 
@@ -1048,34 +1161,39 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error("Recognition error:", err.message);
-    
+
     // Handle different types of errors
-    if (err.code === 'ECONNREFUSED') {
-      return res.status(500).json({ 
-        error: "AI server not running. Please start the AI server on port 8000.",
+    if (err.code === "ECONNREFUSED") {
+      return res.status(500).json({
+        error:
+          "AI server not running. Please start the AI server on port 8000.",
         recognized: false,
         faces: [],
-        errorType: "connection_refused"
+        errorType: "connection_refused",
       });
     }
-    
-    if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-      console.error("AI recognition timed out - this can happen with YOLOv8-face + ArcFace on slower systems");
-      return res.status(504).json({ 
-        error: "Recognition timeout - AI processing took too long. Try again or check AI server performance.",
+
+    if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
+      console.error(
+        "AI recognition timed out - this can happen with YOLOv8-face + ArcFace on slower systems",
+      );
+      return res.status(504).json({
+        error:
+          "Recognition timeout - AI processing took too long. Try again or check AI server performance.",
         recognized: false,
         faces: [],
         errorType: "timeout",
-        suggestion: "The YOLOv8-face + ArcFace models may need more time. Consider optimizing or using a faster GPU."
+        suggestion:
+          "The YOLOv8-face + ArcFace models may need more time. Consider optimizing or using a faster GPU.",
       });
     }
-    
-    res.status(500).json({ 
-      error: "Recognition failed", 
+
+    res.status(500).json({
+      error: "Recognition failed",
       details: err.message,
       recognized: false,
       faces: [],
-      errorType: "unknown"
+      errorType: "unknown",
     });
   }
 });
@@ -1108,48 +1226,48 @@ app.get("/api/subjects/with-teachers", authenticate, async (req, res) => {
   try {
     // All authenticated users can view this
     const subjects = await Subject.find().sort({ name: 1 });
-    
+
     // Get all teachers with their assigned subjects
     const teachers = await User.find({ role: "teacher" })
       .select("name email assignedSubjects")
       .populate("assignedSubjects");
-    
+
     // Build a map of subject -> teachers
     const subjectTeachersMap = {};
-    
-    teachers.forEach(teacher => {
+
+    teachers.forEach((teacher) => {
       if (teacher.assignedSubjects && teacher.assignedSubjects.length > 0) {
-        teacher.assignedSubjects.forEach(subject => {
+        teacher.assignedSubjects.forEach((subject) => {
           const subjectId = subject._id.toString();
           if (!subjectTeachersMap[subjectId]) {
             subjectTeachersMap[subjectId] = {
               subject: subject,
-              teachers: []
+              teachers: [],
             };
           }
           subjectTeachersMap[subjectId].teachers.push({
             _id: teacher._id,
             name: teacher.name,
-            email: teacher.email
+            email: teacher.email,
           });
         });
       }
     });
-    
+
     // Format response: list subjects with their teachers
-    const subjectsWithTeachers = subjects.map(subject => {
+    const subjectsWithTeachers = subjects.map((subject) => {
       const subjectId = subject._id.toString();
       const teachersForSubject = subjectTeachersMap[subjectId]?.teachers || [];
-      
+
       return {
         _id: subject._id,
         name: subject.name,
         code: subject.code,
         teachers: teachersForSubject,
-        hasMultipleTeachers: teachersForSubject.length > 1
+        hasMultipleTeachers: teachersForSubject.length > 1,
       };
     });
-    
+
     res.json(subjectsWithTeachers);
   } catch (err) {
     console.error("Get subjects with teachers error:", err);
@@ -1181,7 +1299,9 @@ app.put("/api/settings", authenticate, async (req, res) => {
     }
     let settings = await Settings.findOne();
     if (!settings) {
-      settings = await Settings.create({ allowManualAttendance: req.body.allowManualAttendance });
+      settings = await Settings.create({
+        allowManualAttendance: req.body.allowManualAttendance,
+      });
     } else {
       settings.allowManualAttendance = req.body.allowManualAttendance;
       await settings.save();
@@ -1204,19 +1324,26 @@ app.post("/api/enrollments", authenticate, async (req, res) => {
     if (!subjectId) {
       return res.status(400).json({ error: "subjectId is required" });
     }
-    
+
     if (!teacherId) {
-      return res.status(400).json({ error: "teacherId is required. Please select a teacher for this course." });
+      return res
+        .status(400)
+        .json({
+          error:
+            "teacherId is required. Please select a teacher for this course.",
+        });
     }
 
     // Get student ID from user (handle both populated and non-populated)
     let studentId = req.user.studentId;
-    if (studentId && typeof studentId === 'object' && studentId._id) {
+    if (studentId && typeof studentId === "object" && studentId._id) {
       studentId = studentId._id;
     }
-    
+
     if (!studentId) {
-      return res.status(400).json({ error: "Student profile not found. Please contact admin." });
+      return res
+        .status(400)
+        .json({ error: "Student profile not found. Please contact admin." });
     }
 
     // Verify student exists
@@ -1238,23 +1365,25 @@ app.post("/api/enrollments", authenticate, async (req, res) => {
     }
 
     // Check if teacher is assigned to this subject
-    const teacherSubjectIds = (teacher.assignedSubjects || []).map(subj => {
+    const teacherSubjectIds = (teacher.assignedSubjects || []).map((subj) => {
       if (subj && subj._id) {
         return subj._id.toString();
       }
       return subj.toString();
     });
-    
+
     const subjectIdStr = subjectId.toString();
-    const isTeacherAssigned = teacherSubjectIds.includes(subjectIdStr) || 
-                             (teacher.assignedSubjects || []).some(assignedId => {
-                               const assignedIdStr = assignedId._id?.toString() || assignedId.toString();
-                               return assignedIdStr === subjectIdStr;
-                             });
-    
+    const isTeacherAssigned =
+      teacherSubjectIds.includes(subjectIdStr) ||
+      (teacher.assignedSubjects || []).some((assignedId) => {
+        const assignedIdStr =
+          assignedId._id?.toString() || assignedId.toString();
+        return assignedIdStr === subjectIdStr;
+      });
+
     if (!isTeacherAssigned) {
-      return res.status(400).json({ 
-        error: `Teacher ${teacher.name} is not assigned to this subject. Please select a different teacher.` 
+      return res.status(400).json({
+        error: `Teacher ${teacher.name} is not assigned to this subject. Please select a different teacher.`,
       });
     }
 
@@ -1266,9 +1395,9 @@ app.post("/api/enrollments", authenticate, async (req, res) => {
     });
 
     if (existingEnrollment) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `Already enrolled or pending enrollment with ${teacher.name}`,
-        enrollment: existingEnrollment 
+        enrollment: existingEnrollment,
       });
     }
 
@@ -1285,7 +1414,9 @@ app.post("/api/enrollments", authenticate, async (req, res) => {
       .populate("subject")
       .populate("teacher", "name email");
 
-    console.log(`✓ Enrollment request created: Student ${student.name} -> Subject ${subject.name} -> Teacher ${teacher.name}`);
+    console.log(
+      `✓ Enrollment request created: Student ${student.name} -> Subject ${subject.name} -> Teacher ${teacher.name}`,
+    );
 
     res.json({
       message: `Enrollment request submitted successfully to ${teacher.name}`,
@@ -1293,15 +1424,17 @@ app.post("/api/enrollments", authenticate, async (req, res) => {
     });
   } catch (err) {
     console.error("Enrollment error:", err);
-    
+
     // Handle duplicate key error (MongoDB unique index)
     if (err.code === 11000) {
-      return res.status(400).json({ 
-        error: "Already enrolled or pending enrollment with this teacher" 
+      return res.status(400).json({
+        error: "Already enrolled or pending enrollment with this teacher",
       });
     }
-    
-    res.status(500).json({ error: err.message || "Failed to process enrollment request" });
+
+    res
+      .status(500)
+      .json({ error: err.message || "Failed to process enrollment request" });
   }
 });
 
@@ -1314,10 +1447,10 @@ app.get("/api/enrollments/student", authenticate, async (req, res) => {
 
     // Handle both populated and non-populated studentId
     let studentId = req.user.studentId;
-    if (studentId && typeof studentId === 'object' && studentId._id) {
+    if (studentId && typeof studentId === "object" && studentId._id) {
       studentId = studentId._id;
     }
-    
+
     if (!studentId) {
       return res.status(400).json({ error: "Student profile not found" });
     }
@@ -1373,62 +1506,74 @@ app.get("/api/enrollments", authenticate, async (req, res) => {
 });
 
 // Get students enrolled in a specific course (for teacher) - only shows students enrolled with THIS teacher
-app.get("/api/enrollments/course/:subjectId", authenticate, async (req, res) => {
-  try {
-    if (req.user.role !== "teacher" && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const { subjectId } = req.params;
-
-    // Build query for approved enrollments
-    const query = {
-      subject: subjectId,
-      status: "approved",
-    };
-
-    // If teacher, only show students enrolled specifically with THIS teacher
-    if (req.user.role === "teacher") {
-      // Verify teacher is assigned to this subject first
-      const teacher = await User.findById(req.user._id).populate("assignedSubjects");
-      
-      if (!teacher || !teacher.assignedSubjects || teacher.assignedSubjects.length === 0) {
-        return res.status(403).json({ error: "No subjects assigned to you" });
+app.get(
+  "/api/enrollments/course/:subjectId",
+  authenticate,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "teacher" && req.user.role !== "admin") {
+        return res.status(403).json({ error: "Access denied" });
       }
-      
-      const assignedSubjectIds = teacher.assignedSubjects.map(subj => {
-        if (subj && subj._id) {
-          return subj._id.toString();
+
+      const { subjectId } = req.params;
+
+      // Build query for approved enrollments
+      const query = {
+        subject: subjectId,
+        status: "approved",
+      };
+
+      // If teacher, only show students enrolled specifically with THIS teacher
+      if (req.user.role === "teacher") {
+        // Verify teacher is assigned to this subject first
+        const teacher = await User.findById(req.user._id).populate(
+          "assignedSubjects",
+        );
+
+        if (
+          !teacher ||
+          !teacher.assignedSubjects ||
+          teacher.assignedSubjects.length === 0
+        ) {
+          return res.status(403).json({ error: "No subjects assigned to you" });
         }
-        return subj.toString();
-      });
-      
-      const subjectIdStr = subjectId.toString();
-      const isAssigned = assignedSubjectIds.includes(subjectIdStr);
-      
-      if (!isAssigned) {
-        return res.status(403).json({ error: "Not assigned to this subject" });
+
+        const assignedSubjectIds = teacher.assignedSubjects.map((subj) => {
+          if (subj && subj._id) {
+            return subj._id.toString();
+          }
+          return subj.toString();
+        });
+
+        const subjectIdStr = subjectId.toString();
+        const isAssigned = assignedSubjectIds.includes(subjectIdStr);
+
+        if (!isAssigned) {
+          return res
+            .status(403)
+            .json({ error: "Not assigned to this subject" });
+        }
+
+        // Only show enrollments where teacher field matches this teacher
+        query.teacher = req.user._id;
       }
-      
-      // Only show enrollments where teacher field matches this teacher
-      query.teacher = req.user._id;
+
+      const enrollments = await Enrollment.find(query)
+        .populate("student")
+        .populate("subject")
+        .populate("teacher", "name email")
+        .sort({ createdAt: -1 });
+
+      // Extract just the student information
+      const students = enrollments.map((enrollment) => enrollment.student);
+
+      res.json(students);
+    } catch (err) {
+      console.error("Get course enrollments error:", err);
+      res.status(500).json({ error: err.message });
     }
-
-    const enrollments = await Enrollment.find(query)
-      .populate("student")
-      .populate("subject")
-      .populate("teacher", "name email")
-      .sort({ createdAt: -1 });
-
-    // Extract just the student information
-    const students = enrollments.map((enrollment) => enrollment.student);
-
-    res.json(students);
-  } catch (err) {
-    console.error("Get course enrollments error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+  },
+);
 
 // Teacher approves/rejects enrollment
 app.put("/api/enrollments/:enrollmentId", authenticate, async (req, res) => {
@@ -1441,7 +1586,9 @@ app.put("/api/enrollments/:enrollmentId", authenticate, async (req, res) => {
     const { status } = req.body;
 
     if (!["approved", "rejected"].includes(status)) {
-      return res.status(400).json({ error: "Status must be 'approved' or 'rejected'" });
+      return res
+        .status(400)
+        .json({ error: "Status must be 'approved' or 'rejected'" });
     }
 
     const enrollment = await Enrollment.findById(enrollmentId)
@@ -1456,26 +1603,37 @@ app.put("/api/enrollments/:enrollmentId", authenticate, async (req, res) => {
     if (req.user.role === "teacher") {
       // Check if this enrollment's teacher field matches the current teacher
       let enrollmentTeacherId;
-      if (enrollment.teacher && typeof enrollment.teacher === 'object' && enrollment.teacher._id) {
+      if (
+        enrollment.teacher &&
+        typeof enrollment.teacher === "object" &&
+        enrollment.teacher._id
+      ) {
         enrollmentTeacherId = enrollment.teacher._id.toString();
       } else {
-        enrollmentTeacherId = enrollment.teacher?.toString() || enrollment.teacher;
+        enrollmentTeacherId =
+          enrollment.teacher?.toString() || enrollment.teacher;
       }
       const currentTeacherId = req.user._id.toString();
-      
+
       if (enrollmentTeacherId !== currentTeacherId) {
-        console.error(`❌ Teacher ${req.user._id} (${req.user.email}) cannot approve enrollment ${enrollmentId}`);
-        console.error(`   Enrollment is assigned to teacher: ${enrollmentTeacherId}`);
+        console.error(
+          `❌ Teacher ${req.user._id} (${req.user.email}) cannot approve enrollment ${enrollmentId}`,
+        );
+        console.error(
+          `   Enrollment is assigned to teacher: ${enrollmentTeacherId}`,
+        );
         console.error(`   Current teacher: ${currentTeacherId}`);
-        
+
         const teacherName = enrollment.teacher?.name || "Unknown teacher";
-        
-        return res.status(403).json({ 
-          error: `This enrollment request is assigned to ${teacherName}. Only that teacher can approve or reject it.` 
+
+        return res.status(403).json({
+          error: `This enrollment request is assigned to ${teacherName}. Only that teacher can approve or reject it.`,
         });
       }
-      
-      console.log(`✓ Teacher ${req.user._id} is the assigned teacher for this enrollment, approval allowed`);
+
+      console.log(
+        `✓ Teacher ${req.user._id} is the assigned teacher for this enrollment, approval allowed`,
+      );
     }
 
     enrollment.status = status;
@@ -1500,57 +1658,79 @@ app.put("/api/enrollments/:enrollmentId", authenticate, async (req, res) => {
 });
 
 // Get attendance for a specific course (student view)
-app.get("/api/students/:studentId/attendance/course/:subjectId", authenticate, async (req, res) => {
-  try {
-    const { studentId, subjectId } = req.params;
+app.get(
+  "/api/students/:studentId/attendance/course/:subjectId",
+  authenticate,
+  async (req, res) => {
+    try {
+      const { studentId, subjectId } = req.params;
 
-    // Verify student can only view their own attendance (unless admin/teacher)
-    if (req.user.role === "student") {
-      // Handle populated studentId (object with _id) or non-populated (ObjectId/string)
-      let userStudentId;
-      if (req.user.studentId && typeof req.user.studentId === 'object' && req.user.studentId._id) {
-        // Populated: extract _id
-        userStudentId = req.user.studentId._id.toString();
-      } else if (req.user.studentId) {
-        // Not populated: already ObjectId or string
-        userStudentId = req.user.studentId.toString();
-      }
-      
-      if (!userStudentId || userStudentId !== studentId) {
-        console.error(`Access denied: user.studentId=${userStudentId}, requested studentId=${studentId}`);
-        return res.status(403).json({ error: "Access denied. You can only view your own attendance." });
-      }
-    }
+      // Verify student can only view their own attendance (unless admin/teacher)
+      if (req.user.role === "student") {
+        // Handle populated studentId (object with _id) or non-populated (ObjectId/string)
+        let userStudentId;
+        if (
+          req.user.studentId &&
+          typeof req.user.studentId === "object" &&
+          req.user.studentId._id
+        ) {
+          // Populated: extract _id
+          userStudentId = req.user.studentId._id.toString();
+        } else if (req.user.studentId) {
+          // Not populated: already ObjectId or string
+          userStudentId = req.user.studentId.toString();
+        }
 
-    // Check if student is enrolled and approved (only for students, not for admin/teacher)
-    if (req.user.role === "student") {
-      const enrollment = await Enrollment.findOne({
+        if (!userStudentId || userStudentId !== studentId) {
+          console.error(
+            `Access denied: user.studentId=${userStudentId}, requested studentId=${studentId}`,
+          );
+          return res
+            .status(403)
+            .json({
+              error: "Access denied. You can only view your own attendance.",
+            });
+        }
+      }
+
+      // Check if student is enrolled and approved (only for students, not for admin/teacher)
+      if (req.user.role === "student") {
+        const enrollment = await Enrollment.findOne({
+          student: studentId,
+          subject: subjectId,
+          status: "approved",
+        });
+
+        if (!enrollment) {
+          return res
+            .status(403)
+            .json({
+              error: "You are not enrolled or not approved in this course",
+            });
+        }
+      }
+
+      // Fetch attendance records
+      const attendanceRecords = await Attendance.find({
         student: studentId,
         subject: subjectId,
-        status: "approved",
-      });
+      })
+        .populate("subject", "name code")
+        .sort({ date: -1 });
 
-      if (!enrollment) {
-        return res.status(403).json({ error: "You are not enrolled or not approved in this course" });
-      }
+      console.log(
+        `✓ Returning ${attendanceRecords.length} attendance records for student ${studentId}, subject ${subjectId}`,
+      );
+
+      res.json(attendanceRecords);
+    } catch (err) {
+      console.error("Get attendance by course error:", err);
+      res
+        .status(500)
+        .json({ error: err.message || "Failed to fetch attendance" });
     }
-
-    // Fetch attendance records
-    const attendanceRecords = await Attendance.find({
-      student: studentId,
-      subject: subjectId,
-    })
-      .populate("subject", "name code")
-      .sort({ date: -1 });
-
-    console.log(`✓ Returning ${attendanceRecords.length} attendance records for student ${studentId}, subject ${subjectId}`);
-
-    res.json(attendanceRecords);
-  } catch (err) {
-    console.error("Get attendance by course error:", err);
-    res.status(500).json({ error: err.message || "Failed to fetch attendance" });
-  }
-});
+  },
+);
 
 // Bulk mark attendance for enrolled students in a course (teacher)
 app.post("/api/attendance/bulk", authenticate, async (req, res) => {
@@ -1561,17 +1741,24 @@ app.post("/api/attendance/bulk", authenticate, async (req, res) => {
 
     const settings = await Settings.findOne();
     if (!settings?.allowManualAttendance) {
-      return res.status(403).json({ error: "Manual attendance not allowed by admin" });
+      return res
+        .status(403)
+        .json({ error: "Manual attendance not allowed by admin" });
     }
 
     const { subjectId, date, attendances } = req.body; // attendances: [{studentId, status}]
 
     if (!subjectId || !date || !Array.isArray(attendances)) {
-      return res.status(400).json({ error: "subjectId, date, and attendances array required" });
+      return res
+        .status(400)
+        .json({ error: "subjectId, date, and attendances array required" });
     }
 
     // Verify teacher is assigned to this subject
-    if (!req.user.assignedSubjects || !req.user.assignedSubjects.includes(subjectId)) {
+    if (
+      !req.user.assignedSubjects ||
+      !req.user.assignedSubjects.includes(subjectId)
+    ) {
       return res.status(403).json({ error: "Not assigned to this subject" });
     }
 
@@ -1601,7 +1788,10 @@ app.post("/api/attendance/bulk", authenticate, async (req, res) => {
       });
 
       if (!enrollment) {
-        errors.push({ studentId, error: "Student not enrolled or not approved in this course" });
+        errors.push({
+          studentId,
+          error: "Student not enrolled or not approved in this course",
+        });
         continue;
       }
 
@@ -1618,7 +1808,11 @@ app.post("/api/attendance/bulk", authenticate, async (req, res) => {
           existing.status = status || "present";
           existing.markedBy = "manual";
           await existing.save();
-          results.push({ studentId, action: "updated", attendanceId: existing._id });
+          results.push({
+            studentId,
+            action: "updated",
+            attendanceId: existing._id,
+          });
         } else {
           // Create new attendance
           const attendance = await Attendance.create({
@@ -1628,7 +1822,11 @@ app.post("/api/attendance/bulk", authenticate, async (req, res) => {
             markedBy: "manual",
             status: status || "present",
           });
-          results.push({ studentId, action: "created", attendanceId: attendance._id });
+          results.push({
+            studentId,
+            action: "created",
+            attendanceId: attendance._id,
+          });
         }
       } catch (err) {
         errors.push({ studentId, error: err.message });
@@ -1650,9 +1848,9 @@ app.post("/api/attendance/bulk", authenticate, async (req, res) => {
 // Catch-all error handler - always return JSON
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
-  res.status(err.status || 500).json({ 
+  res.status(err.status || 500).json({
     error: err.message || "Internal server error",
-    details: process.env.NODE_ENV === "development" ? err.stack : undefined
+    details: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
 

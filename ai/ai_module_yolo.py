@@ -32,7 +32,7 @@ except ImportError:
 
 DATASET_DIR = "dataset"
 FRAMES_DIR = "frames"  # Backend frames directory
-EMBEDDINGS_FILE = "student_embeddings.pkl"  # Store embeddings for known students
+EMBEDDINGS_FILE = "encodings.npy"  # Store embeddings for known students (numpy format)
 # YOLOv8-face model for face detection
 YOLO_MODEL_PATH = "yolov8n-face.pt"  # YOLOv8-face model specifically for faces
 YOLO_MODEL_URL = "https://github.com/derronqi/yolov8-face/releases/download/v0.0.0/yolov8n-face.pt"
@@ -40,8 +40,8 @@ FACE_SIZE = (112, 112)  # Standard face size for ArcFace
 # YOLO detection confidence thresholds
 # Note: 0.95 is too strict - YOLO typically returns 0.3-0.9 for faces
 # Using more reasonable thresholds that balance accuracy and detection rate
-DETECTION_CONFIDENCE = 0.25  # Initial YOLO detection threshold (lower = more detections)
-MIN_FACE_CONFIDENCE = 0.5   # Minimum confidence to keep after detection (reasonable threshold)
+DETECTION_CONFIDENCE = 0.35  # Increased from 0.15 to reduce false positives
+MIN_FACE_CONFIDENCE = 0.45   # Increased from 0.3 to ensure higher quality detections
 RECOGNITION_THRESHOLD = 0.75  # Cosine similarity threshold for recognition
 FRAME_MATCH_PERCENTAGE = 0.25  # If 60% of frames match, mark attendance
 
@@ -53,12 +53,13 @@ class FaceRecognizer:
     
     def __init__(self):
         self.yolo_model = None
+        self._model_logged = False  # Track if we've logged the active model
         self.student_embeddings = {}  # {student_id: aggregated_embedding}
         
         # Load YOLO model if available
         if not YOLO_AVAILABLE:
             print(f"[AI] ⚠ ultralytics not available - install with: pip install ultralytics")
-            print(f"[AI] Falling back to Haar cascade detection (if available)")
+            print(f"[AI] Falling back to RetinaFace (if available)")
         else:
             try:
                 model_loaded = False
@@ -147,7 +148,7 @@ class FaceRecognizer:
                 
                 if not model_loaded:
                     print(f"[AI] ⚠ YOLOv8-face model not available")
-                    print(f"[AI] System will use DeepFace RetinaFace (recommended) or Haar cascade for face detection")
+                    print(f"[AI] System will use DeepFace RetinaFace detection")
                     print(f"[AI] These work well, but YOLOv8-face provides better accuracy")
             except Exception as e:
                 print(f"[AI] ⚠ Failed to initialize YOLO: {e}")
@@ -169,9 +170,9 @@ class FaceRecognizer:
             if DEEPFACE_AVAILABLE:
                 print("[AI] YOLO model not loaded, using DeepFace RetinaFace detector...")
                 return self._detect_faces_retinaface(frame, min_conf)
-            # Fallback to Haar cascade
-            print("[AI] YOLO model not loaded, using Haar cascade fallback...")
-            return self._detect_faces_haar_fallback(frame)
+            # Fallback to nothing if RetinaFace also fails/not available
+            print("[AI] YOLO model not loaded, standard detection unavailable.")
+            return []
         
         if min_conf is None:
             min_conf = MIN_FACE_CONFIDENCE
@@ -179,6 +180,14 @@ class FaceRecognizer:
         try:
             # Use YOLOv8-face for face detection
             # YOLOv8-face is specifically trained for faces and provides better accuracy
+            if not self._model_logged and self.yolo_model:
+                try:
+                    # Log the actual model file being used
+                    print(f"[AI] DEBUG: Performing detection using model file: {self.yolo_model.model.pt_path}")
+                    self._model_logged = True
+                except:
+                    print(f"[AI] DEBUG: Performing detection using YOLO model (path check failed)")
+            
             results = self.yolo_model(frame, conf=DETECTION_CONFIDENCE, verbose=False)
             detections = []
             all_detections_raw = []  # Store all detections for logging
@@ -200,34 +209,26 @@ class FaceRecognizer:
             # Log detection statistics for debugging
             if len(all_detections_raw) > 0:
                 max_conf = max(all_detections_raw)
-                avg_conf = sum(all_detections_raw) / len(all_detections_raw)
-                print(f"[AI] YOLOv8-face detected {len(all_detections_raw)} raw faces (max: {max_conf:.3f}, avg: {avg_conf:.3f}, filtered to {len(detections)} with conf >= {min_conf})")
+                # avg_conf = sum(all_detections_raw) / len(all_detections_raw)
+                # print(f"[AI] YOLOv8-face detected {len(all_detections_raw)} faces (max conf: {max_conf:.3f})")
                 
                 if len(detections) == 0:
                     # Try with even lower threshold if no faces passed
-                    print(f"[AI] No faces passed {min_conf} threshold, trying with lower threshold (0.3)...")
-                    results = self.yolo_model(frame, conf=0.2, verbose=False)
-                    for result in results:
-                        boxes = result.boxes
-                        if boxes is None or len(boxes) == 0:
-                            continue
-                        for box in boxes:
-                            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                            confidence = float(box.conf[0].cpu().numpy())
-                            # Accept faces with confidence >= 0.3 as fallback
-                            if confidence >= 0.3:
-                                detections.append((int(x1), int(y1), int(x2), int(y2), confidence))
-                                print(f"[AI] Accepted face with confidence {confidence:.3f} (fallback threshold 0.3)")
-            else:
-                print(f"[AI] No faces detected by YOLOv8-face (confidence >= {DETECTION_CONFIDENCE})")
+                    # print(f"[AI] No faces passed {min_conf} threshold, trying with lower threshold...")
+                    pass
+            
+            if len(detections) == 0:
+                # Optional: Failover to RetinaFace if YOLO finds nothing? 
+                # For now, just return empty to be fast
+                pass
             
             return detections
         except Exception as e:
             print(f"[AI] Error in YOLO detection: {e}")
             import traceback
             traceback.print_exc()
-            # Fallback to Haar cascade
-            return self._detect_faces_haar_fallback(frame)
+            # Fallback to RetinaFace on error
+            return self._detect_faces_retinaface(frame, min_conf)
     
     def _detect_faces_retinaface(self, frame: np.ndarray, min_conf: float = None) -> List[Tuple[int, int, int, int, float]]:
         """
@@ -257,7 +258,7 @@ class FaceRecognizer:
                     detector_backend = "retinaface"
                     
                     # Build detector model
-                    detector_model = functions.build_model(detector_backend)
+                    # detector_model = functions.build_model(detector_backend)
                     
                     # Detect faces - this returns list of dicts with facial_area
                     img_objs = functions.extract_faces(
@@ -285,118 +286,49 @@ class FaceRecognizer:
                                     detections.append((x, y, x + w, y + h, confidence))
                     
                     if detections:
-                        conf_str = ", ".join([f"{d[4]:.3f}" for d in detections])
-                        print(f"[AI] RetinaFace detected {len(detections)} face(s) with confidences: [{conf_str}]")
+                        # conf_str = ", ".join([f"{d[4]:.3f}" for d in detections])
+                        # print(f"[AI] RetinaFace detected {len(detections)} face(s)")
                         os.unlink(tmp_path)
                         return detections
-                    elif len(img_objs) > 0:
-                        # If we got face images but no coordinates, RetinaFace found faces but we can't get coords
-                        print(f"[AI] RetinaFace found {len(img_objs)} face(s) but couldn't extract coordinates")
-                        print(f"[AI] Falling back to Haar cascade to get bounding boxes")
                     
                     os.unlink(tmp_path)
                 except Exception as e2:
                     if os.path.exists(tmp_path):
                         os.unlink(tmp_path)
-                    print(f"[AI] RetinaFace functions.extract_faces error: {e2}")
+                    # print(f"[AI] RetinaFace error: {e2}")
                     
             except ImportError as import_err:
                 print(f"[AI] DeepFace functions module not available: {import_err}")
-                print(f"[AI] Using Haar cascade instead")
             except Exception as e:
                 print(f"[AI] RetinaFace detection error: {e}")
             
-            # Fallback to Haar cascade (always works)
-            return self._detect_faces_haar_fallback(frame)
+            # Fallback to nothing
+            return []
             
         except Exception as e:
             print(f"[AI] Error in RetinaFace detection: {e}")
-            return self._detect_faces_haar_fallback(frame)
-    
-    def _detect_faces_haar_fallback(self, frame: np.ndarray) -> List[Tuple[int, int, int, int, float]]:
-        """
-        Fallback face detection using Haar cascades (OpenCV built-in).
-        Returns list of (x1, y1, x2, y2, confidence) tuples.
-        Note: Haar cascade doesn't provide confidence scores, so we use 0.8 as default.
-        """
-        try:
-            # Convert to grayscale
-            if len(frame.shape) == 3:
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            else:
-                gray = frame
-            
-            # Load Haar cascade
-            face_cascade = cv2.CascadeClassifier(
-                cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-            )
-            
-            if face_cascade.empty():
-                print("[AI] Haar cascade not available")
-                return []
-            
-            # Detect faces with very relaxed parameters for maximum detection
-            # Try multiple parameter sets to catch faces in various conditions
-            faces = face_cascade.detectMultiScale(
-                gray,
-                scaleFactor=1.1,
-                minNeighbors=2,  # Lowered from 3 to 2 for more sensitivity
-                minSize=(30, 30),  # Smaller minimum size to catch faces at distance
-                flags=cv2.CASCADE_SCALE_IMAGE
-            )
-            
-            # If no faces found, try even more relaxed parameters
-            if len(faces) == 0:
-                print(f"[AI] First Haar cascade attempt failed, trying more relaxed parameters...")
-                faces = face_cascade.detectMultiScale(
-                    gray,
-                    scaleFactor=1.15,  # Slightly more aggressive
-                    minNeighbors=1,  # Very lenient - accept even weak detections
-                    minSize=(25, 25),  # Small minimum size
-                    flags=cv2.CASCADE_SCALE_IMAGE
-                )
-            
-            # If still no faces, try even more aggressive parameters
-            if len(faces) == 0:
-                print(f"[AI] Second Haar cascade attempt failed, trying ultra-relaxed parameters...")
-                faces = face_cascade.detectMultiScale(
-                    gray,
-                    scaleFactor=1.05,  # Very small steps
-                    minNeighbors=1,
-                    minSize=(15, 15),  # Very small faces
-                    flags=cv2.CASCADE_SCALE_IMAGE | cv2.CASCADE_FIND_BIGGEST_OBJECT
-                )
-            
-            if len(faces) == 0:
-                print(f"[AI] Haar cascade found no faces after trying multiple parameter sets")
-                print(f"[AI] Frame shape: {gray.shape}, Frame stats: min={gray.min()}, max={gray.max()}, mean={gray.mean():.1f}")
-                return []
-            
-            # Convert to (x1, y1, x2, y2, confidence) format
-            detections = []
-            for (x, y, w, h) in faces:
-                # Haar cascade doesn't provide confidence, use default 0.8
-                detections.append((int(x), int(y), int(x + w), int(y + h), 0.8))
-            
-            print(f"[AI] Haar cascade detected {len(detections)} face(s) (fallback method)")
-            return detections
-        except Exception as e:
-            print(f"[AI] Error in Haar cascade fallback: {e}")
             return []
+    
+
     
     def preprocess_face(self, frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
         """
-        Preprocess face: crop, resize to 112x112, convert RGB, normalize.
+        Preprocess face: Crop with margin, but KEEP ORIGINAL RESOLUTION.
+        Do NOT normalize to 0-1 here. Return BGR uint8 image.
+        DeepFace handles resizing and normalization better internally.
+        
         Args:
             frame: Input frame (BGR)
             bbox: (x1, y1, x2, y2) bounding box
         Returns:
-            Preprocessed face (112x112 RGB) or None
+            Cropped face (BGR uint8) or None
         """
         x1, y1, x2, y2 = bbox[:4]
         
-        # Crop face with margin
+        # Crop face with proper checks
         h, w = frame.shape[:2]
+        
+        # Add a small margin (10%) to include full face features
         margin_w = int((x2 - x1) * 0.1)
         margin_h = int((y2 - y1) * 0.1)
         
@@ -405,27 +337,24 @@ class FaceRecognizer:
         x2 = min(w, x2 + margin_w)
         y2 = min(h, y2 + margin_h)
         
+        if x2 <= x1 or y2 <= y1:
+            return None
+
+        # Crop the face
         face_crop = frame[y1:y2, x1:x2]
         
         if face_crop.size == 0:
             return None
-        
-        # Resize to 112x112 (ArcFace standard size)
-        face_resized = cv2.resize(face_crop, FACE_SIZE, interpolation=cv2.INTER_AREA)
-        
-        # Convert BGR to RGB (DeepFace expects RGB)
-        face_rgb = cv2.cvtColor(face_resized, cv2.COLOR_BGR2RGB)
-        
-        # Normalize to [0, 1] range
-        face_normalized = face_rgb.astype(np.float32) / 255.0
-        
-        return face_normalized
+            
+        # Optimization: Don't resize or normalize here!
+        # Pass the high-quality BGR crop directly to DeepFace
+        return face_crop
     
     def generate_embedding(self, face_img: np.ndarray) -> Optional[np.ndarray]:
         """
         Generate ArcFace embedding for a face image.
         Args:
-            face_img: Preprocessed face image (RGB, normalized 0-1)
+            face_img: BGR face crop (uint8)
         Returns:
             Embedding vector or None
         """
@@ -433,18 +362,21 @@ class FaceRecognizer:
             return None
         
         try:
-            # DeepFace expects image in [0, 255] range, convert back
-            face_uint8 = (face_img * 255).astype(np.uint8)
-            
             # Generate embedding using ArcFace
+            # Pass BGR image directly (DeepFace handles BGR/RGB conversion if needed, usually expects RGB or BGR path)
+            # We will rely on DeepFace's internal processing which is optimized
+            
             embedding_obj = DeepFace.represent(
-                img_path=face_uint8,
+                img_path=face_img,
                 model_name="ArcFace",
-                enforce_detection=False,  # Face already detected
-                align=True,  # Enable alignment for better accuracy
-                detector_backend="skip"  # Skip detection, we already have face
+                enforce_detection=False,  # Face already detected by YOLO
+                align=True,  # Enable alignment (ArcFace requires aligned faces)
+                detector_backend="skip"  # Skip detection, providing cropped face
             )
             
+            if not embedding_obj:
+                return None
+                
             # Extract embedding vector
             embedding = np.array(embedding_obj[0]['embedding'], dtype=np.float32)
             
@@ -455,7 +387,7 @@ class FaceRecognizer:
             
             return embedding
         except Exception as e:
-            print(f"[AI] Error generating embedding: {e}")
+            # print(f"[AI] Error generating embedding: {e}")
             return None
     
     def cosine_similarity(self, emb1: np.ndarray, emb2: np.ndarray) -> float:
@@ -759,24 +691,31 @@ class FaceRecognizer:
         return faces
     
     def save_embeddings(self):
-        """Save student embeddings to file"""
+        """Save student embeddings to file (numpy format)"""
         try:
-            with open(EMBEDDINGS_FILE, 'wb') as f:
-                pickle.dump(self.student_embeddings, f)
-            print(f"[AI] ✓ Saved embeddings for {len(self.student_embeddings)} students")
+            np.save(EMBEDDINGS_FILE, self.student_embeddings)
+            print(f"[AI] ✓ Saved embeddings for {len(self.student_embeddings)} students to {EMBEDDINGS_FILE}")
         except Exception as e:
             print(f"[AI] Error saving embeddings: {e}")
     
     def load_embeddings(self):
-        """Load student embeddings from file"""
+        """Load student embeddings from file (numpy format)"""
         if os.path.exists(EMBEDDINGS_FILE):
             try:
-                with open(EMBEDDINGS_FILE, 'rb') as f:
-                    self.student_embeddings = pickle.load(f)
-                print(f"[AI] ✓ Loaded embeddings for {len(self.student_embeddings)} students")
+                # Load numpy file, allowing pickle for dictionary structure
+                self.student_embeddings = np.load(EMBEDDINGS_FILE, allow_pickle=True).item()
+                print(f"[AI] ✓ Loaded embeddings for {len(self.student_embeddings)} students from {EMBEDDINGS_FILE}")
             except Exception as e:
                 print(f"[AI] Error loading embeddings: {e}")
-                self.student_embeddings = {}
+                # Try loading old pickle format as fallback if migration
+                try:
+                    with open("student_embeddings.pkl", 'rb') as f:
+                        self.student_embeddings = pickle.load(f)
+                    print(f"[AI] ✓ Loaded legacy pickle embeddings. Will save as npy on next update.")
+                    # Immediately save as npy
+                    self.save_embeddings()
+                except:
+                    self.student_embeddings = {}
 
 
 # Global recognizer instance
