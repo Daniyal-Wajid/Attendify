@@ -41,9 +41,9 @@ FACE_SIZE = (112, 112)  # Standard face size for ArcFace
 # Note: 0.95 is too strict - YOLO typically returns 0.3-0.9 for faces
 # Using more reasonable thresholds that balance accuracy and detection rate
 DETECTION_CONFIDENCE = 0.35  # Increased from 0.15 to reduce false positives
-MIN_FACE_CONFIDENCE = 0.45   # Increased from 0.3 to ensure higher quality detections
-RECOGNITION_THRESHOLD = 0.75  # Cosine similarity threshold for recognition
-FRAME_MATCH_PERCENTAGE = 0.25  # If 60% of frames match, mark attendance
+MIN_FACE_CONFIDENCE = 0.45   # Lowered from 0.60 to be more inclusive but still quality
+RECOGNITION_THRESHOLD = 0.60  # Sweet spot (higher than 0.75, lower than 0.85)
+FRAME_MATCH_PERCENTAGE = 0.25  # If 25% of frames match, mark attendance
 
 os.makedirs(DATASET_DIR, exist_ok=True)
 
@@ -460,8 +460,8 @@ class FaceRecognizer:
             
             processed_count += 1
             
-            # Detect faces using YOLO (use lower threshold for training to get more faces)
-            detections = self.detect_faces_yolo(frame, min_conf=0.3)  # More lenient during training
+            # Detect faces using YOLO (use higher threshold for training to ensure high-quality reference)
+            detections = self.detect_faces_yolo(frame, min_conf=0.5)  # Increased from 0.3 to ensure quality
             
             if not detections:
                 if idx < 5 or idx % 10 == 0:  # Log first few and every 10th
@@ -561,18 +561,22 @@ class FaceRecognizer:
         
         for student_id, known_embedding in self.student_embeddings.items():
             similarity = self.cosine_similarity(query_embedding, known_embedding)
+            # Log all comparisons for debugging accuracy
+            if similarity > 0.5:
+                print(f"[AI] Similarity with {student_id}: {similarity:.4f}")
             
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = student_id
         
         # Check if similarity meets threshold
+        # Check if similarity meets threshold
         if best_match and best_similarity >= RECOGNITION_THRESHOLD:
-            print(f"[AI] Recognized {best_match} with similarity {best_similarity:.3f}")
+            # print(f"[AI] Recognized {best_match} with similarity {best_similarity:.4f}")
             return best_match
         else:
-            if best_match:
-                print(f"[AI] Best match {best_match} but similarity {best_similarity:.3f} < threshold {RECOGNITION_THRESHOLD}")
+            # if best_match:
+            #     print(f"[AI] Best match {best_match} but similarity {best_similarity:.4f} < threshold {RECOGNITION_THRESHOLD}")
             return None
     
     def recognize_from_multiple_frames(self, frames: List[np.ndarray], min_match_percentage: float = FRAME_MATCH_PERCENTAGE) -> Optional[str]:
@@ -624,19 +628,19 @@ class FaceRecognizer:
                 print(f"[AI] Best match {best_student} but only {best_percentage*100:.1f}% frames matched (required {min_match_percentage*100:.1f}%)")
             return None
     
-    def recognize_face_with_coords(self, frame: np.ndarray) -> Tuple[Optional[str], Optional[Tuple[int, int, int, int]]]:
+    def recognize_face_with_coords(self, frame: np.ndarray) -> Tuple[Optional[str], Optional[Tuple[int, int, int, int]], float]:
         """
-        Recognize face and return student_id with bounding box coordinates.
-        Returns (student_id, (x, y, w, h)) or (None, None)
+        Recognize face and return student_id, bounding box, and confidence.
+        Returns (student_id, (x, y, w, h), confidence)
         """
         if not self.student_embeddings:
-            return None, None
+            return None, None, 0.0
         
         # Detect faces
         detections = self.detect_faces_yolo(frame)
         
         if not detections:
-            return None, None
+            return None, None, 0.0
         
         # Use largest face
         detections_sorted = sorted(
@@ -652,12 +656,12 @@ class FaceRecognizer:
         face_preprocessed = self.preprocess_face(frame, largest_detection[:4])
         
         if face_preprocessed is None:
-            return None, None
+            return None, None, 0.0
         
         query_embedding = self.generate_embedding(face_preprocessed)
         
         if query_embedding is None:
-            return None, None
+            return None, None, 0.0
         
         # Compare with known embeddings
         best_match = None
@@ -665,16 +669,84 @@ class FaceRecognizer:
         
         for student_id, known_embedding in self.student_embeddings.items():
             similarity = self.cosine_similarity(query_embedding, known_embedding)
+            # Log all comparisons
+            if similarity > 0.5:
+                print(f"[AI] Similarity with {student_id}: {similarity:.4f}")
             
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = student_id
         
-        if best_match and best_similarity >= RECOGNITION_THRESHOLD:
-            print(f"[AI] Recognized {best_match} with similarity {best_similarity:.3f}")
-            return best_match, bbox
+        # Return best match regardless of threshold, so backend can decide
+        return best_match, bbox, float(best_similarity)
+
+    def recognize_all_faces(self, frame: np.ndarray) -> List[Dict]:
+        """
+        Optimized single-pass recognition for multiple faces.
+        Returns a list of dictionaries with student_id, confidence, and bounding box.
+        """
+        results = []
+        if not self.student_embeddings:
+            # Still detect faces even if none are registered
+            detections = self.detect_faces_yolo(frame)
+            for d in detections:
+                x1, y1, x2, y2 = d[:4]
+                results.append({
+                    "student_id": None,
+                    "confidence": 0.0,
+                    "bbox": [int(x1), int(y1), int(x2-x1), int(y2-y1)],
+                    "recognized": False
+                })
+            return results
+
+        # Detect faces once
+        detections = self.detect_faces_yolo(frame)
+        print(f"[AI] Batch processing: {len(detections)} faces detected")
         
-        return None, None
+        for d in detections:
+            x1, y1, x2, y2 = d[:4]
+            bbox_h = [int(x1), int(y1), int(x2-x1), int(y2-y1)]
+            
+            # Recognition for this face
+            face_img = self.preprocess_face(frame, d[:4])
+            if face_img is None:
+                results.append({
+                    "student_id": None,
+                    "confidence": 0.0,
+                    "bbox": bbox_h,
+                    "recognized": False
+                })
+                continue
+                
+            emb = self.generate_embedding(face_img)
+            if emb is None:
+                results.append({
+                    "student_id": None,
+                    "confidence": 0.0,
+                    "bbox": bbox_h,
+                    "recognized": False
+                })
+                continue
+            
+            best_match = None
+            best_similarity = 0.0
+            
+            for student_id, known_emb in self.student_embeddings.items():
+                sim = self.cosine_similarity(emb, known_emb)
+                if sim > best_similarity:
+                    best_similarity = sim
+                    best_match = student_id
+            
+            is_rec = bool(best_match and best_similarity >= RECOGNITION_THRESHOLD)
+            
+            results.append({
+                "student_id": best_match if is_rec else None,
+                "confidence": float(best_similarity),
+                "bbox": bbox_h,
+                "recognized": is_rec
+            })
+            
+        return results
     
     def detect_all_faces(self, frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
         """
@@ -742,10 +814,15 @@ def recognize_face(frame: np.ndarray) -> Optional[str]:
     return recognizer.recognize_face(frame)
 
 
-def recognize_face_with_coords(frame: np.ndarray) -> Tuple[Optional[str], Optional[Tuple[int, int, int, int]]]:
-    """Recognize face and return student_id with bounding box"""
+def recognize_face_with_coords(frame: np.ndarray) -> Tuple[Optional[str], Optional[Tuple[int, int, int, int]], float]:
+    """Recognize face and return student_id, bounding box, and confidence"""
     recognizer = get_recognizer()
     return recognizer.recognize_face_with_coords(frame)
+
+def recognize_all_faces(frame: np.ndarray) -> List[Dict]:
+    """Multi-face recognition optimized"""
+    recognizer = get_recognizer()
+    return recognizer.recognize_all_faces(frame)
 
 
 def detect_all_faces(frame: np.ndarray) -> List[Tuple[int, int, int, int]]:

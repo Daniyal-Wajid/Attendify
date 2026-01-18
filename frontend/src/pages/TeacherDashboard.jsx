@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
 import axios from "axios";
+import { Camera, Globe } from "lucide-react";
 
 export default function TeacherDashboard() {
   const [user, setUser] = useState(null);
@@ -30,10 +31,49 @@ export default function TeacherDashboard() {
     date: new Date().toISOString().split('T')[0],
     attendances: [], // [{studentId, status}]
   });
+
+  // Camera State
+  const [cameraMode, setCameraMode] = useState("webcam"); // 'webcam' | 'ip'
+  const [ipUrl, setIpUrl] = useState("");
+  const [ipError, setIpError] = useState(false);
+  const ipCameraRef = useRef(null);
+
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-  const recognitionIntervalRef = useRef(null);
+  const offscreenCanvasRef = useRef(null); // Reuse canvas for speed
+  const recognitionTimeoutRef = useRef(null);
+  const isComponentMounted = useRef(true);
+  const isLiveFeedActiveRef = useRef(false); // Ref for loop safety
   const navigate = useNavigate();
+
+  // Helper to capture from IP stream securely (Optimized)
+  const captureIpFrame = () => {
+    return new Promise((resolve, reject) => {
+      const img = ipCameraRef.current;
+      if (!img) return reject("No element");
+      if (!img.complete || img.naturalWidth === 0) return reject("Not loaded");
+
+      try {
+        if (!offscreenCanvasRef.current) {
+          offscreenCanvasRef.current = document.createElement("canvas");
+        }
+        const canvas = offscreenCanvasRef.current;
+        if (canvas.width !== img.naturalWidth) canvas.width = img.naturalWidth;
+        if (canvas.height !== img.naturalHeight) canvas.height = img.naturalHeight;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/jpeg", 0.7)); // Low quality for speed
+      } catch (e) {
+        reject("CORS Error");
+      }
+    });
+  };
+
+  useEffect(() => {
+    isComponentMounted.current = true;
+    return () => { isComponentMounted.current = false; };
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -49,10 +89,9 @@ export default function TeacherDashboard() {
     // Don't auto-start live feed - let teacher control it
 
     return () => {
-      // Cleanup on unmount - stop live feed if active
-      if (recognitionIntervalRef.current) {
-        clearInterval(recognitionIntervalRef.current);
-        recognitionIntervalRef.current = null;
+      if (recognitionTimeoutRef.current) {
+        clearTimeout(recognitionTimeoutRef.current);
+        recognitionTimeoutRef.current = null;
       }
       setIsLiveFeedActive(false);
     };
@@ -128,82 +167,90 @@ export default function TeacherDashboard() {
   };
 
   const startLiveRecognition = () => {
-    if (isLiveFeedActive) {
-      console.log("Live feed is already running");
-      return;
-    }
-
-    if (!selectedSubject) {
-      alert("Please select a subject first");
-      return;
-    }
+    if (isLiveFeedActive) return;
+    if (!selectedSubject) return alert("Please select a subject first.");
 
     setIsLiveFeedActive(true);
-    recognitionIntervalRef.current = setInterval(async () => {
-      if (!webcamRef.current || !selectedSubject) return;
+    isLiveFeedActiveRef.current = true;
 
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (!imageSrc) return;
-
-      try {
-        const token = localStorage.getItem("token");
-        const res = await axios.post(
-          "http://localhost:5000/api/attendance/recognize-live",
-          { imageBase64: imageSrc },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        // Always update detected faces for drawing
-        if (res.data.faces && Array.isArray(res.data.faces)) {
-          setDetectedFaces(res.data.faces);
-        }
-
-        if (res.data.recognized && res.data.student && res.data.faceBox) {
-          const now = Date.now();
-          const studentId = res.data.student._id;
-          
-          // Only keep the most recent recognition for each student
-          // Remove old recognitions for this student to prevent duplicates
-          setRecognizedStudents((prev) => {
-            // Remove all previous entries for this student
-            const filtered = prev.filter((s) => s.student._id !== studentId);
-            // Add the new recognition
-            return [
-              ...filtered,
-              {
-                student: res.data.student,
-                faceBox: res.data.faceBox,
-                timestamp: now,
-              },
-            ];
-          });
-
-          // Auto-mark attendance (will check for duplicates on backend)
-          markAttendance(studentId, "auto");
-        } else if (res.data.faces && res.data.faces.length > 0) {
-          // Face detected but not recognized - clear recognized students
-          // Only show gray boxes for unrecognized faces
-          setRecognizedStudents([]);
-        } else {
-          // No faces detected - clear everything
-          setDetectedFaces([]);
-          setRecognizedStudents([]);
-        }
-      } catch (err) {
-        console.error("Recognition error:", err);
+    const runRecognition = async () => {
+      console.log("[Dashboard] Recognition loop tick");
+      // Safety checks - use current values from refs
+      if (!isComponentMounted.current || !isLiveFeedActiveRef.current) {
+        console.log("[Dashboard] Loop stopping: mounted:", isComponentMounted.current, "active:", isLiveFeedActiveRef.current);
+        return;
       }
-    }, 1000); // Check every second
+
+      let imageSrc = null;
+      try {
+        if (cameraMode === "webcam") {
+          imageSrc = webcamRef.current?.getScreenshot();
+          if (!imageSrc) console.log("[Dashboard] Webcam screenshot NULL");
+        } else if (ipUrl) {
+          imageSrc = await captureIpFrame();
+          if (!imageSrc) console.log("[Dashboard] IP frame NULL");
+        }
+      } catch (e) {
+        console.error("[Dashboard] Capture failed:", e);
+      }
+
+      if (imageSrc) {
+        try {
+          console.log("[Dashboard] Sending recognition request to backend...");
+          const token = localStorage.getItem("token");
+          const res = await axios.post(
+            "http://localhost:5000/api/attendance/recognize-live",
+            { imageBase64: imageSrc },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          console.log("[Dashboard] Backend response:", res.data);
+
+          // Update All detected faces for boxes
+          if (res.data.faces) setDetectedFaces(res.data.faces);
+
+          // Update multi-recognitions (Batch support)
+          if (res.data.recognitions && res.data.recognitions.length > 0) {
+            const now = Date.now();
+            setRecognizedStudents((prev) => {
+              // Update state while keeping other recent recognitions
+              let updated = [...prev];
+              res.data.recognitions.forEach(rec => {
+                // Filter out old entry for THIS student if it exists
+                updated = updated.filter(s => s.student._id !== rec.student?._id);
+                // Add fresh one
+                updated.push({ ...rec, timestamp: now });
+                // Auto-mark attendance
+                if (rec.student?._id) markAttendance(rec.student._id, "auto");
+              });
+              return updated;
+            });
+          } else if (res.data.faces && res.data.faces.length > 0) {
+            // Keep recent names on screen (handled in drawing loop)
+          } else {
+            setDetectedFaces([]);
+            setRecognizedStudents([]);
+          }
+        } catch (err) {
+          console.error("AI Error:", err);
+        }
+      }
+
+      // Schedule next call only AFTER current one finishes
+      if (isLiveFeedActiveRef.current && isComponentMounted.current) {
+        recognitionTimeoutRef.current = setTimeout(runRecognition, 5000); // 5 second interval
+      }
+    };
+
+    runRecognition();
   };
 
   const stopLiveRecognition = () => {
-    if (recognitionIntervalRef.current) {
-      clearInterval(recognitionIntervalRef.current);
-      recognitionIntervalRef.current = null;
+    if (recognitionTimeoutRef.current) {
+      clearTimeout(recognitionTimeoutRef.current);
+      recognitionTimeoutRef.current = null;
     }
     setIsLiveFeedActive(false);
-    // Clear recognized students and detected faces when stopping
+    isLiveFeedActiveRef.current = false;
     setRecognizedStudents([]);
     setDetectedFaces([]);
   };
@@ -237,7 +284,7 @@ export default function TeacherDashboard() {
       // Check content type before parsing
       const contentType = res.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await res.json();
       } else {
@@ -265,7 +312,7 @@ export default function TeacherDashboard() {
           setMarkedToday((prev) => new Set([...prev, todayKey]));
           return;
         }
-        
+
         if (data.error?.includes("not enrolled") || data.error?.includes("not approved")) {
           // Student not enrolled - log warning but don't show alert for auto-attendance
           const student = recognizedStudents.find((s) => s.student._id === studentId);
@@ -277,7 +324,7 @@ export default function TeacherDashboard() {
           }
           return;
         }
-        
+
         console.error("Attendance marking error:", data.error || data.message);
         if (markedBy === "manual") {
           alert(data.error || data.message || "Failed to mark attendance");
@@ -301,65 +348,126 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !webcamRef.current) return;
+    if (!canvas) return;
 
-    const video = webcamRef.current.video;
-    if (!video) return;
+    const getActiveVideo = () => webcamRef.current?.video || ipCameraRef.current;
 
     const ctx = canvas.getContext("2d");
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+
+    const updateCanvasSize = () => {
+      const video = webcamRef.current?.video || ipCameraRef.current;
+      if (!video) return;
+
+      const displayWidth = video.clientWidth;
+      const displayHeight = video.clientHeight;
+
+      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+      }
+    };
 
     const draw = () => {
+      updateCanvasSize();
+      const video = webcamRef.current?.video || ipCameraRef.current;
+      if (!video || !canvas.width) {
+        requestAnimationFrame(draw);
+        return;
+      }
+
+      // Get scaling factors
+      const videoWidth = video.videoWidth || video.naturalWidth || 640;
+      const videoHeight = video.videoHeight || video.naturalHeight || 480;
+      const scaleX = canvas.width / videoWidth;
+      const scaleY = canvas.height / videoHeight;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Only show the most recently recognized student (one at a time)
-      if (recognizedStudents.length > 0) {
-        // Get the most recent recognition
-        const latest = recognizedStudents.reduce((latest, current) => 
-          current.timestamp > latest.timestamp ? current : latest
-        );
-        
-        if (latest.faceBox) {
-          const { x, y, w, h } = latest.faceBox;
-          
+      // 1. Draw recognized students
+      recognizedStudents.forEach((rec) => {
+        // Only show if recognition is recent (within 2 seconds)
+        if (Date.now() - rec.timestamp > 2000) return;
+
+        if (rec.faceBox) {
+          const { x, y, w, h } = rec.faceBox;
+          const sx = x * scaleX;
+          const sy = y * scaleY;
+          const sw = w * scaleX;
+          const sh = h * scaleY;
+
           // Draw green box
           ctx.strokeStyle = "#10b981";
           ctx.lineWidth = 3;
-          ctx.strokeRect(x, y, w, h);
-          
-          // Draw name label with background for better visibility
-          const name = latest.student.name;
-          ctx.font = "bold 16px Arial";
-          const textWidth = ctx.measureText(name).width;
-          
-          // Draw background rectangle for text
-          ctx.fillStyle = "rgba(16, 185, 129, 0.8)";
-          ctx.fillRect(x, y - 25, textWidth + 10, 20);
-          
-          // Draw text
+          ctx.strokeRect(sx, sy, sw, sh);
+
+          // Label
+          const name = rec.student.name;
+          const conf = rec.confidence ? `(${(rec.confidence * 100).toFixed(0)}%)` : "";
+          const label = `${name} ${conf}`;
+
+          ctx.font = "bold 14px Inter, system-ui, sans-serif";
+          const textWidth = ctx.measureText(label).width;
+
+          ctx.fillStyle = "rgba(16, 185, 129, 0.9)";
+          const labelHeight = 24;
+          ctx.fillRect(sx, sy - labelHeight, textWidth + 12, labelHeight);
+
           ctx.fillStyle = "#ffffff";
-          ctx.fillText(name, x + 5, y - 8);
+          ctx.fillText(label, sx + 6, sy - 7);
         }
-      }
+      });
 
-      // Draw all detected faces (unrecognized) with gray boxes
-      // Only show if no student is currently recognized
-      if (recognizedStudents.length === 0) {
-        detectedFaces.forEach((face) => {
-          if (!face || typeof face.x !== 'number' || typeof face.y !== 'number') return;
-          
-          ctx.strokeStyle = "#9ca3af";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(face.x, face.y, face.w || 100, face.h || 100);
+      // 2. Draw other detected faces as "Unregistered"
+      detectedFaces.forEach((face) => {
+        if (!face || typeof face.x !== 'number') return;
+
+        // Skip if this face is already handled by a recognized student
+        const isRecognized = recognizedStudents.some(rec => {
+          // Check if recognition is fresh (within 2 seconds)
+          if (Date.now() - rec.timestamp < 2000 && rec.faceBox) {
+            // Check overlap (allow some margin for movement/scaling)
+            const overlap = Math.abs(rec.faceBox.x - face.x) < 50 && Math.abs(rec.faceBox.y - face.y) < 50;
+            return overlap;
+          }
+          return false;
         });
-      }
 
-      requestAnimationFrame(draw);
+        if (isRecognized) return;
+
+        const sx = face.x * scaleX;
+        const sy = face.y * scaleY;
+        const sw = face.w * scaleX;
+        const sh = face.h * scaleY;
+
+        // Draw orange box for unregistered
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]); // Dashed line for unregistered
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.setLineDash([]); // Reset
+
+        // "Unregistered" Label
+        const label = "Unregistered";
+        ctx.font = "bold 12px Inter, system-ui, sans-serif";
+        const textWidth = ctx.measureText(label).width;
+
+        ctx.fillStyle = "rgba(245, 158, 11, 0.9)"; // Orange
+        ctx.fillRect(sx, sy - 20, textWidth + 10, 20);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(label, sx + 5, sy - 5);
+      });
+
+      const frameId = requestAnimationFrame(draw);
+      return frameId;
     };
 
-    draw();
-  }, [recognizedStudents, detectedFaces]);
+    const frameId = draw();
+
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, [recognizedStudents, detectedFaces, cameraMode, isLiveFeedActive]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -403,11 +511,10 @@ export default function TeacherDashboard() {
           <nav className="flex gap-4">
             <button
               onClick={() => setActiveTab("camera")}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-                activeTab === "camera"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "camera"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
             >
               Live Camera
             </button>
@@ -416,11 +523,10 @@ export default function TeacherDashboard() {
                 setActiveTab("attendance");
                 loadData(); // Refresh attendance when switching tabs
               }}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-                activeTab === "attendance"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "attendance"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
             >
               View Attendance
             </button>
@@ -429,11 +535,10 @@ export default function TeacherDashboard() {
                 setActiveTab("enrollments");
                 loadData(); // Refresh enrollments when switching tabs
               }}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-                activeTab === "enrollments"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "enrollments"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
             >
               Enrollments ({enrollments.filter(e => e.status === "pending").length})
             </button>
@@ -448,6 +553,26 @@ export default function TeacherDashboard() {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-bold">Live Camera Feed</h2>
                   <div className="flex items-center gap-3">
+                    {/* Camera Toggles */}
+                    <div className="flex bg-gray-100 rounded-lg p-1 mr-4">
+                      <button
+                        onClick={() => !isLiveFeedActive && setCameraMode("webcam")}
+                        disabled={isLiveFeedActive}
+                        className={`px-3 py-1 text-sm font-medium rounded flex items-center gap-2 transition-colors ${cameraMode === "webcam" ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"
+                          } ${isLiveFeedActive ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <Camera size={16} /> Webcam
+                      </button>
+                      <button
+                        onClick={() => !isLiveFeedActive && setCameraMode("ip")}
+                        disabled={isLiveFeedActive}
+                        className={`px-3 py-1 text-sm font-medium rounded flex items-center gap-2 transition-colors ${cameraMode === "ip" ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"
+                          } ${isLiveFeedActive ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <Globe size={16} /> IP Camera
+                      </button>
+                    </div>
+
                     {isLiveFeedActive && (
                       <span className="flex items-center gap-2 text-red-600">
                         <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
@@ -457,7 +582,7 @@ export default function TeacherDashboard() {
                     {!isLiveFeedActive ? (
                       <button
                         onClick={startLiveRecognition}
-                        disabled={!selectedSubject}
+                        disabled={!selectedSubject || (cameraMode === "ip" && !ipUrl)}
                         className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                       >
                         <span>▶</span>
@@ -474,14 +599,58 @@ export default function TeacherDashboard() {
                     )}
                   </div>
                 </div>
-                <div className="relative">
-                  <Webcam
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{ facingMode: "user" }}
-                    className="w-full rounded-lg"
-                    style={{ opacity: isLiveFeedActive ? 1 : 0.5 }}
-                  />
+
+                {cameraMode === "ip" && !isLiveFeedActive && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">IP Camera URL</label>
+                    <input
+                      type="text"
+                      value={ipUrl}
+                      onChange={(e) => setIpUrl(e.target.value)}
+                      placeholder="http://192.168.1.X:8080/video"
+                      className="w-full px-4 py-2 border rounded-lg"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Camera must support CORS for processing.</p>
+                  </div>
+                )}
+
+                <div className="relative bg-black rounded-lg overflow-hidden min-h-[480px] flex items-center justify-center">
+                  {cameraMode === "webcam" ? (
+                    <Webcam
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{ facingMode: "user" }}
+                      className="w-full h-full object-contain"
+                      style={{ opacity: isLiveFeedActive ? 1 : 0.5 }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col">
+                      {ipUrl ? (
+                        <img
+                          ref={ipCameraRef}
+                          src={ipUrl}
+                          crossOrigin="anonymous"
+                          className="w-full h-full object-contain"
+                          alt="IP Stream"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-white opacity-50">
+                          <Globe size={48} className="mb-2" />
+                          <p>Enter IP Camera URL</p>
+                        </div>
+                      )}
+                      {/* Fallback for error */}
+                      <div className={`flex flex-col items-center justify-center h-full text-white opacity-50 absolute inset-0 ${ipError ? 'flex' : 'hidden'}`}>
+                        <Globe size={48} className="mb-2" />
+                        <p>Stream Error</p>
+                      </div>
+                    </div>
+                  )}
+
                   <canvas
                     ref={canvasRef}
                     className="absolute top-0 left-0 w-full h-full pointer-events-none"
@@ -621,24 +790,22 @@ export default function TeacherDashboard() {
                             </td>
                             <td className="p-2">
                               <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${
-                                  (record.status || "present") === "present"
-                                    ? "bg-green-100 text-green-700"
-                                    : (record.status || "present") === "absent"
+                                className={`px-2 py-1 rounded text-xs font-medium ${(record.status || "present") === "present"
+                                  ? "bg-green-100 text-green-700"
+                                  : (record.status || "present") === "absent"
                                     ? "bg-red-100 text-red-700"
                                     : "bg-yellow-100 text-yellow-700"
-                                }`}
+                                  }`}
                               >
                                 {(record.status || "present") === "present" ? "Present" : (record.status || "present") === "absent" ? "Absent" : "Leave"}
                               </span>
                             </td>
                             <td className="p-2">
                               <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${
-                                  record.markedBy === "auto"
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-blue-100 text-blue-700"
-                                }`}
+                                className={`px-2 py-1 rounded text-xs font-medium ${record.markedBy === "auto"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-blue-100 text-blue-700"
+                                  }`}
                               >
                                 {record.markedBy === "auto" ? "Auto" : "Manual"}
                               </span>
@@ -916,10 +1083,9 @@ export default function TeacherDashboard() {
                           const data = await res.json();
                           if (res.ok) {
                             alert(
-                              `Successfully processed ${data.results.length} attendances${
-                                data.errors && data.errors.length > 0
-                                  ? `. ${data.errors.length} errors occurred.`
-                                  : ""
+                              `Successfully processed ${data.results.length} attendances${data.errors && data.errors.length > 0
+                                ? `. ${data.errors.length} errors occurred.`
+                                : ""
                               }`
                             );
                             setShowBulkAttendance(false);
@@ -1017,7 +1183,7 @@ export default function TeacherDashboard() {
                                 // Check content type before parsing
                                 const contentType = res.headers.get("content-type");
                                 let data;
-                                
+
                                 if (contentType && contentType.includes("application/json")) {
                                   data = await res.json();
                                 } else {
@@ -1062,7 +1228,7 @@ export default function TeacherDashboard() {
                                 // Check content type before parsing
                                 const contentType = res.headers.get("content-type");
                                 let data;
-                                
+
                                 if (contentType && contentType.includes("application/json")) {
                                   data = await res.json();
                                 } else {

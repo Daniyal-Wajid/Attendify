@@ -1076,6 +1076,7 @@ app.get("/api/dashboard", async (req, res) => {
 
 /* -------------------- Live Recognition (with face coordinates) -------------------- */
 app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
+  console.log("[Backend] Received recognize-live request");
   try {
     const { imageBase64 } = req.body;
 
@@ -1107,57 +1108,44 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
       },
     );
 
-    console.log("AI Recognition response:", {
-      recognized: aiRes.data.recognized,
-      studentId: aiRes.data.studentId,
-      facesDetected: aiRes.data.faces?.length || 0,
-    });
+    console.log(`[Backend] AI Server returned ${aiRes.data.count || 0} results`);
 
-    if (!aiRes.data.recognized) {
-      return res.json({
-        recognized: false,
-        faces: aiRes.data.faces || [],
-        student: null,
-        error: aiRes.data.error,
-      });
+    // Process all results from AI (Batch mode)
+    const aiResults = aiRes.data.results || [];
+    const processedRecognitions = [];
+    const allDetectedFaces = [];
+
+    for (const resItem of aiResults) {
+      const { student_id, confidence, bbox, recognized } = resItem;
+      const faceBox = { x: bbox[0], y: bbox[1], w: bbox[2], h: bbox[3] };
+
+      allDetectedFaces.push(faceBox);
+
+      if (recognized && student_id) {
+        try {
+          // Optimized: Fetch only needed fields
+          const student = await Student.findById(student_id);
+          if (student) {
+            processedRecognitions.push({
+              student,
+              confidence,
+              faceBox,
+              recognized: true
+            });
+            console.log(`✓ Batch Recognized: ${student.name} (${student_id}) at ${(confidence * 100).toFixed(1)}%`);
+          }
+        } catch (dbErr) {
+          console.error(`Error fetching student ${student_id}:`, dbErr.message);
+        }
+      }
     }
 
-    const studentId = aiRes.data.studentId;
-    const faceBox = aiRes.data.faceBox;
-
-    if (!studentId) {
-      return res.json({
-        recognized: false,
-        faces: aiRes.data.faces || [],
-        student: null,
-      });
-    }
-
-    // Find student by ID (mongoose handles string ObjectIds)
-    const student = await Student.findById(studentId);
-    if (!student) {
-      console.error(`Student not found for ID: ${studentId}`);
-      console.error(
-        `Available student IDs in labels should match MongoDB ObjectIds`,
-      );
-      return res.json({
-        recognized: false,
-        faces: aiRes.data.faces || [],
-        error: `Student with ID ${studentId} not found in database`,
-      });
-    }
-
-    console.log(`Recognized student: ${student.name} (${studentId})`);
-
+    // Return the comprehensive results to frontend
     res.json({
-      recognized: true,
-      student: {
-        _id: student._id,
-        name: student.name,
-        rollNumber: student.rollNumber,
-      },
-      faceBox,
-      faces: aiRes.data.faces || [],
+      recognized: processedRecognitions.length > 0,
+      recognitions: processedRecognitions,
+      faces: allDetectedFaces,
+      count: aiResults.length
     });
   } catch (err) {
     console.error("Recognition error:", err.message);
@@ -1195,6 +1183,47 @@ app.post("/api/attendance/recognize-live", authenticate, async (req, res) => {
       faces: [],
       errorType: "unknown",
     });
+  }
+});
+
+/* -------------------- Single Recognition (Backward compatibility) -------------------- */
+app.post("/api/attendance/recognize", authenticate, async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: "Image required" });
+
+    const buffer = Buffer.from(imageBase64.replace(/^data:image\/\w+;base64,/, ""), "base64");
+    const formData = new FormData();
+    formData.append("frame", buffer, { filename: "frame.jpg", contentType: "image/jpeg" });
+
+    const aiRes = await axios.post("http://127.0.0.1:8000/recognize-live", formData, {
+      headers: formData.getHeaders(),
+      timeout: 30000,
+    });
+
+    const results = aiRes.data.results || [];
+    if (results.length === 0) return res.json({ recognized: false, faces: [] });
+
+    const bestRec = results.filter(r => r.recognized).sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+
+    if (bestRec) {
+      const student = await Student.findById(bestRec.student_id);
+      return res.json({
+        recognized: true,
+        student: student || { _id: bestRec.student_id, name: "Unknown" },
+        confidence: bestRec.confidence,
+        faceBox: { x: bestRec.bbox[0], y: bestRec.bbox[1], w: bestRec.bbox[2], h: bestRec.bbox[3] },
+        faces: results.map(r => ({ x: r.bbox[0], y: r.bbox[1], w: r.bbox[2], h: r.bbox[3] }))
+      });
+    }
+
+    res.json({
+      recognized: false,
+      faces: results.map(r => ({ x: r.bbox[0], y: r.bbox[1], w: r.bbox[2], h: r.bbox[3] }))
+    });
+  } catch (err) {
+    console.error("Single recognize error:", err.message);
+    res.status(500).json({ error: "Recognition failed", details: err.message });
   }
 });
 

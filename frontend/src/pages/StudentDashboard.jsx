@@ -66,13 +66,13 @@ export default function StudentDashboard() {
 
   const handleEnroll = async (subjectId, teacherId) => {
     const token = localStorage.getItem("token");
-    
+
     if (!token) {
       alert("You must be logged in to enroll in courses. Please login again.");
       navigate("/login");
       return;
     }
-    
+
     if (!teacherId) {
       alert("Please select a teacher for this course.");
       return;
@@ -91,7 +91,7 @@ export default function StudentDashboard() {
       // Check content type before parsing
       const contentType = res.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         try {
           data = await res.json();
@@ -108,7 +108,7 @@ export default function StudentDashboard() {
           contentType: contentType,
           preview: text.substring(0, 200)
         });
-        
+
         if (res.status === 0) {
           throw new Error("Network error: Unable to connect to server. Please ensure the backend server is running.");
         } else {
@@ -127,7 +127,7 @@ export default function StudentDashboard() {
       }
     } catch (err) {
       console.error("Enrollment error:", err);
-      
+
       if (err.message && (err.message.includes("JSON") || err.message.includes("Network") || err.message.includes("fetch"))) {
         alert("Enrollment failed: Unable to connect to server. Please ensure the backend server is running on http://localhost:5000 and try again.");
       } else {
@@ -143,7 +143,7 @@ export default function StudentDashboard() {
     }
 
     const token = localStorage.getItem("token");
-    
+
     // Extract studentId - handle both populated (object with _id) and non-populated (string/ObjectId)
     let studentId;
     if (user.studentId && typeof user.studentId === 'object' && user.studentId._id) {
@@ -154,7 +154,7 @@ export default function StudentDashboard() {
       alert("Student ID not found. Please contact admin.");
       return;
     }
-    
+
     // Extract subjectId - handle both populated and non-populated
     let subjectId;
     if (enrollment.subject && typeof enrollment.subject === 'object' && enrollment.subject._id) {
@@ -177,7 +177,7 @@ export default function StudentDashboard() {
       // Check content type before parsing
       const contentType = res.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         try {
           data = await res.json();
@@ -196,7 +196,7 @@ export default function StudentDashboard() {
         setCourseAttendance(attendanceData);
         setSelectedCourse(enrollment);
         setShowCourseAttendance(true);
-        
+
         if (attendanceData.length === 0) {
           // Still show the view, but user will see "No attendance records"
           console.log("No attendance records found for this course");
@@ -244,32 +244,32 @@ export default function StudentDashboard() {
 
   const isEnrolled = (subjectId, teacherId = null) => {
     if (!subjectId || enrollments.length === 0) return false;
-    
+
     const normalizedSubjectId = normalizeId(subjectId);
-    
+
     if (teacherId) {
       // Check if enrolled with a specific teacher
       const normalizedTeacherId = normalizeId(teacherId);
       if (!normalizedTeacherId) return false; // Invalid teacherId
-      
+
       return enrollments.some((e) => {
         if (!e || !e.subject) return false;
-        
+
         const enrollmentSubjectId = normalizeId(e.subject);
         if (!enrollmentSubjectId) return false;
-        
+
         const subjectMatch = enrollmentSubjectId === normalizedSubjectId;
         if (!subjectMatch) return false;
-        
+
         // Check teacher match - teacher field is required for new enrollments
         if (!e.teacher) return false; // No teacher means this enrollment doesn't match
         const enrollmentTeacherId = normalizeId(e.teacher);
         if (!enrollmentTeacherId) return false;
-        
+
         return enrollmentTeacherId === normalizedTeacherId;
       });
     }
-    
+
     // Check if enrolled with any teacher for this subject
     return enrollments.some((e) => {
       if (!e || !e.subject) return false;
@@ -280,32 +280,32 @@ export default function StudentDashboard() {
 
   const getEnrollmentStatus = (subjectId, teacherId = null) => {
     if (!subjectId || enrollments.length === 0) return null;
-    
+
     const normalizedSubjectId = normalizeId(subjectId);
-    
+
     const enrollment = enrollments.find((e) => {
       if (!e || !e.subject) return false;
-      
+
       const enrollmentSubjectId = normalizeId(e.subject);
       const subjectMatch = enrollmentSubjectId === normalizedSubjectId;
-      
+
       if (!subjectMatch) return false;
-      
+
       if (teacherId) {
         if (!e.teacher) return false; // No teacher means this enrollment doesn't match
         const normalizedTeacherId = normalizeId(teacherId);
         if (!normalizedTeacherId) return false; // Invalid teacherId
-        
+
         const enrollmentTeacherId = normalizeId(e.teacher);
         if (!enrollmentTeacherId) return false;
-        
+
         return enrollmentTeacherId === normalizedTeacherId;
       }
-      
+
       // If no teacherId specified, return true if subject matches (for backward compatibility)
       return true;
     });
-    
+
     return enrollment ? enrollment.status : null;
   };
 
@@ -321,7 +321,7 @@ export default function StudentDashboard() {
     const subject = selectedCourse.subject;
     const subjectName = subject?.name || (typeof subject === 'object' && subject?.name) || "Unknown Subject";
     const subjectCode = subject?.code || (typeof subject === 'object' && subject?.code) || "";
-    
+
     return (
       <div className="min-h-screen bg-gray-50">
         <nav className="bg-white shadow-sm border-b">
@@ -407,28 +407,26 @@ export default function StudentDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                record.status === "present"
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${record.status === "present"
                                   ? "bg-green-100 text-green-700"
                                   : record.status === "absent"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-yellow-100 text-yellow-700"
-                              }`}
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"
+                                }`}
                             >
                               {record.status === "present"
                                 ? "Present"
                                 : record.status === "absent"
-                                ? "Absent"
-                                : "Leave"}
+                                  ? "Absent"
+                                  : "Leave"}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                             <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                record.markedBy === "auto"
+                              className={`px-2 py-1 rounded text-xs font-medium ${record.markedBy === "auto"
                                   ? "bg-gray-100 text-gray-700"
                                   : "bg-blue-100 text-blue-700"
-                              }`}
+                                }`}
                             >
                               {record.markedBy === "auto" ? "Auto" : "Manual"}
                             </span>
@@ -471,21 +469,19 @@ export default function StudentDashboard() {
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab("enrolled")}
-                className={`${
-                  activeTab === "enrolled"
+                className={`${activeTab === "enrolled"
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
                 My Enrolled Courses ({enrollments.length})
               </button>
               <button
                 onClick={() => setActiveTab("browse")}
-                className={`${
-                  activeTab === "browse"
+                className={`${activeTab === "browse"
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
               >
                 Browse All Courses ({availableSubjects.length})
               </button>
@@ -589,7 +585,7 @@ export default function StudentDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {availableSubjects.map((subject) => {
                   if (!subject || !subject._id) return null;
-                  
+
                   return (
                     <div
                       key={subject._id}
@@ -617,10 +613,10 @@ export default function StudentDashboard() {
                         <div className="border-t pt-4 space-y-2">
                           {subject.teachers.map((teacher) => {
                             if (!teacher || !teacher._id) return null;
-                            
+
                             const teacherEnrolled = isEnrolled(subject._id, teacher._id);
                             const teacherStatus = getEnrollmentStatus(subject._id, teacher._id);
-                            
+
                             return (
                               <div
                                 key={teacher._id}
@@ -640,7 +636,7 @@ export default function StudentDashboard() {
                                     </span>
                                   )}
                                 </div>
-                                
+
                                 {!teacherEnrolled ? (
                                   <button
                                     onClick={() => {
@@ -662,9 +658,9 @@ export default function StudentDashboard() {
                                             const enrollmentSubjectId = normalizeId(e.subject);
                                             const currentSubjectId = normalizeId(subject._id);
                                             const subjectMatch = enrollmentSubjectId === currentSubjectId;
-                                            
+
                                             if (!subjectMatch) return false;
-                                            
+
                                             if (!e.teacher) return false;
                                             const enrollmentTeacherId = normalizeId(e.teacher);
                                             const currentTeacherId = normalizeId(teacher._id);

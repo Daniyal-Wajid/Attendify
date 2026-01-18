@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Camera, Globe } from "lucide-react";
 
 export default function StudentRegister() {
   const videoRef = useRef(null);
@@ -18,6 +19,12 @@ export default function StudentRegister() {
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(10);
   const [stream, setStream] = useState(null);
+  const [cameraMode, setCameraMode] = useState("webcam"); // 'webcam' | 'ip'
+  const [ipUrl, setIpUrl] = useState("");
+  const [ipError, setIpError] = useState(false);
+  const ipCameraRef = useRef(null);
+  const recordingCanvasRef = useRef(null);
+  const canvasIntervalRef = useRef(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -54,40 +61,97 @@ export default function StudentRegister() {
   }, [uploadedVideoPreview]);
 
   async function openCameraScreen() {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      setStream(mediaStream);
-      
-      // Set video source
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      
-      // Create MediaRecorder when camera is ready
-      const recorder = new MediaRecorder(mediaStream, {
-        mimeType: 'video/webm;codecs=vp8'
-      });
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          chunksRef.current.push(e.data);
+    setIpError(false);
+    if (cameraMode === "webcam") {
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setStream(mediaStream);
+
+        // Set video source
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
         }
-      };
-      
-                  recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        setVideoFile(blob);
-        setVideoSource("camera");
-        setRecording(false);
-        setTimer(10);
-        setErrors({ ...errors, video: "" });
-      };
-      
-      mediaRecorderRef.current = recorder;
-      setCameraReady(true);
+
+        // Create MediaRecorder when camera is ready
+        const recorder = new MediaRecorder(mediaStream, {
+          mimeType: 'video/webm;codecs=vp8'
+        });
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            chunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onstop = () => {
+          const blob = new Blob(chunksRef.current, { type: "video/webm" });
+          setVideoFile(blob);
+          setVideoSource("camera");
+          setRecording(false);
+          setTimer(10);
+          setErrors({ ...errors, video: "" });
+        };
+
+        mediaRecorderRef.current = recorder;
+        setCameraReady(true);
+        setShowCameraScreen(true);
+      } catch (err) {
+        alert("Camera permission denied");
+        console.error(err);
+      }
+    } else {
+      // IP Mode
+      if (!ipUrl) {
+        alert("Please enter IP Camera URL first");
+        return;
+      }
       setShowCameraScreen(true);
-    } catch (err) {
-      alert("Camera permission denied");
-      console.error(err);
+      // Give modal some time to render refs
+      setTimeout(() => {
+        if (recordingCanvasRef.current && ipCameraRef.current) {
+          const canvas = recordingCanvasRef.current;
+          const img = ipCameraRef.current;
+          const ctx = canvas.getContext("2d");
+
+          const streamFromCanvas = canvas.captureStream(25); // 25 FPS
+          setStream(streamFromCanvas);
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = streamFromCanvas;
+          }
+
+          const recorder = new MediaRecorder(streamFromCanvas, {
+            mimeType: 'video/webm;codecs=vp8'
+          });
+
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              chunksRef.current.push(e.data);
+            }
+          };
+
+          recorder.onstop = () => {
+            const blob = new Blob(chunksRef.current, { type: "video/webm" });
+            setVideoFile(blob);
+            setVideoSource("camera");
+            setRecording(false);
+            setTimer(10);
+            setErrors({ ...errors, video: "" });
+          };
+
+          mediaRecorderRef.current = recorder;
+
+          // Start the drawing loop
+          canvasIntervalRef.current = setInterval(() => {
+            if (img.complete && img.naturalWidth !== 0) {
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              ctx.drawImage(img, 0, 0);
+            }
+          }, 40); // ~25 FPS
+
+          setCameraReady(true);
+        }
+      }, 500);
     }
   }
 
@@ -108,7 +172,7 @@ export default function StudentRegister() {
             chunksRef.current.push(e.data);
           }
         };
-        
+
         recorder.onstop = () => {
           const blob = new Blob(chunksRef.current, { type: "video/webm" });
           setVideoFile(blob);
@@ -117,7 +181,7 @@ export default function StudentRegister() {
           setTimer(10);
           setErrors({ ...errors, video: "" });
         };
-        
+
         mediaRecorderRef.current = recorder;
       } catch (err) {
         console.error("Error creating MediaRecorder:", err);
@@ -152,6 +216,10 @@ export default function StudentRegister() {
       stream.getTracks().forEach((track) => track.stop());
       setStream(null);
     }
+    if (canvasIntervalRef.current) {
+      clearInterval(canvasIntervalRef.current);
+      canvasIntervalRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       try {
         mediaRecorderRef.current.stop();
@@ -164,6 +232,7 @@ export default function StudentRegister() {
     setCameraReady(false);
     setRecording(false);
     setTimer(10);
+    setIpError(false);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -216,7 +285,7 @@ export default function StudentRegister() {
     // Check video duration
     const videoElement = document.createElement('video');
     videoElement.preload = 'metadata';
-    
+
     videoElement.onloadedmetadata = () => {
       window.URL.revokeObjectURL(videoElement.src);
       const duration = videoElement.duration;
@@ -318,7 +387,7 @@ export default function StudentRegister() {
       formData.append("email", form.email);
       formData.append("password", form.password);
       formData.append("confirmPassword", form.confirmPassword);
-      
+
       // Use uploaded video if available, otherwise use recorded video
       const videoToUpload = uploadedVideo || videoFile;
       if (!videoToUpload) {
@@ -326,7 +395,7 @@ export default function StudentRegister() {
         setLoading(false);
         return;
       }
-      
+
       formData.append("video", videoToUpload);
 
       const res = await fetch("http://localhost:5000/api/students/register", {
@@ -378,9 +447,8 @@ export default function StudentRegister() {
                   setForm({ ...form, name: e.target.value });
                   setErrors({ ...errors, name: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                  errors.name ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.name ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder="Enter your full name"
               />
               {errors.name && (
@@ -400,9 +468,8 @@ export default function StudentRegister() {
                   setForm({ ...form, rollNumber: e.target.value });
                   setErrors({ ...errors, rollNumber: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                  errors.rollNumber ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.rollNumber ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder="Enter your roll number"
               />
               {errors.rollNumber && (
@@ -423,9 +490,8 @@ export default function StudentRegister() {
                 setForm({ ...form, email: e.target.value });
                 setErrors({ ...errors, email: "" });
               }}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                errors.email ? "border-red-500" : "border-gray-300"
-              }`}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.email ? "border-red-500" : "border-gray-300"
+                }`}
               placeholder="Enter your email"
             />
             {errors.email && (
@@ -446,9 +512,8 @@ export default function StudentRegister() {
                   setForm({ ...form, password: e.target.value });
                   setErrors({ ...errors, password: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                  errors.password ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.password ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder="Enter password"
               />
               {errors.password && (
@@ -468,9 +533,8 @@ export default function StudentRegister() {
                   setForm({ ...form, confirmPassword: e.target.value });
                   setErrors({ ...errors, confirmPassword: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                  errors.confirmPassword ? "border-red-500" : "border-gray-300"
-                }`}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                  }`}
                 placeholder="Confirm password"
               />
               {errors.confirmPassword && (
@@ -488,13 +552,45 @@ export default function StudentRegister() {
             <div className="space-y-4">
               {!videoFile && !uploadedVideo ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={openCameraScreen}
-                    className="px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg flex items-center justify-center gap-2"
-                  >
-                    📷 Record Video
-                  </button>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex bg-gray-100 rounded-lg p-1">
+                      <button
+                        type="button"
+                        onClick={() => setCameraMode("webcam")}
+                        className={`flex-1 px-4 py-2 text-sm font-medium rounded flex items-center justify-center gap-2 transition-colors ${cameraMode === "webcam" ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        <Camera size={16} /> Webcam
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCameraMode("ip")}
+                        className={`flex-1 px-4 py-2 text-sm font-medium rounded flex items-center justify-center gap-2 transition-colors ${cameraMode === "ip" ? "bg-white shadow text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        <Globe size={16} /> IP Camera
+                      </button>
+                    </div>
+
+                    {cameraMode === "ip" && (
+                      <div>
+                        <input
+                          type="text"
+                          value={ipUrl}
+                          onChange={(e) => setIpUrl(e.target.value)}
+                          placeholder="Enter IP Camera URL (e.g., http://.../video)"
+                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={openCameraScreen}
+                      disabled={cameraMode === "ip" && !ipUrl}
+                      className="px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-lg flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      📷 {cameraMode === "webcam" ? "Record Video" : "Connect & Record"}
+                    </button>
+                  </div>
                   <label className="px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-lg flex items-center justify-center gap-2 cursor-pointer">
                     📁 Upload Video
                     <input
@@ -554,20 +650,51 @@ export default function StudentRegister() {
             <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
                 <div className="relative">
-                  <video
-                    ref={(el) => {
-                      videoRef.current = el;
-                      if (el && stream) {
-                        el.srcObject = stream;
-                      }
-                    }}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full rounded-lg border-4 border-blue-500"
-                    style={{ maxHeight: "70vh" }}
-                  />
-                  
+                  {cameraMode === "webcam" ? (
+                    <video
+                      ref={(el) => {
+                        videoRef.current = el;
+                        if (el && stream && cameraMode === "webcam") {
+                          el.srcObject = stream;
+                        }
+                      }}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full rounded-lg border-4 border-blue-500"
+                      style={{ maxHeight: "70vh" }}
+                    />
+                  ) : (
+                    <div className="relative">
+                      <img
+                        ref={ipCameraRef}
+                        src={ipUrl}
+                        crossOrigin="anonymous"
+                        className="w-full rounded-lg border-4 border-blue-500"
+                        style={{ maxHeight: "70vh", display: ipError ? 'none' : 'block' }}
+                        alt="IP Stream"
+                        onError={() => setIpError(true)}
+                      />
+                      {ipError && (
+                        <div className="w-full aspect-video bg-gray-900 rounded-lg flex flex-col items-center justify-center text-white gap-2">
+                          <Globe size={48} className="text-gray-500" />
+                          <p className="text-red-500 font-medium">Stream Error</p>
+                          <p className="text-xs text-gray-400">Check URL and CORS settings</p>
+                        </div>
+                      )}
+                      {/* Hidden canvas for recording */}
+                      <canvas ref={recordingCanvasRef} className="hidden" />
+                      {/* Preview video for what's being captured */}
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className="w-full absolute inset-0 opacity-0 pointer-events-none"
+                      />
+                    </div>
+                  )}
+
                   {/* Timer Overlay */}
                   {recording && (
                     <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg">

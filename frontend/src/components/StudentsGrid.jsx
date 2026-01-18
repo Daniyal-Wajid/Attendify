@@ -1,3 +1,4 @@
+
 import { students } from "../data/mockStudents";
 import StudentCard from "./StudentCard";
 

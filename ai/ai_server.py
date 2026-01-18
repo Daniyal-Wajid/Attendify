@@ -12,7 +12,7 @@ processing_lock = threading.Lock()
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from ai_module_yolo import FaceRecognizer
+    from ai_module_yolo import FaceRecognizer, RECOGNITION_THRESHOLD
     recognizer = FaceRecognizer()
     print(f"[AI Server] Initialized Face Detection System (YOLOv8-face: {recognizer.yolo_model.model.pt_path if recognizer and recognizer.yolo_model else 'Unknown'})")
 except Exception as e:
@@ -87,34 +87,19 @@ def recognize_live():
         if frame is None:
             return jsonify({"error": "Failed to decode image", "recognized": False}), 400
 
-        # Detect all faces for UI
-        all_faces_coords = recognizer.detect_all_faces(frame)
-        all_faces_list = [{"x": int(f[0]), "y": int(f[1]), "w": int(f[2]), "h": int(f[3])} for f in all_faces_coords]
-
-        # Try recognition
+        # Try recognition (Batch mode)
         with processing_lock:
-            # Re-detect within lock to ensure safety if YOLO is not thread safe
-            # Although we detected specific faces earlier for UI, we need robust recognition here
-            student_id, face_box = recognizer.recognize_face_with_coords(frame)
+            # Returns list of {"student_id", "confidence", "bbox", "recognized"}
+            results = recognizer.recognize_all_faces(frame)
         
-        if student_id:
-            print(f"[AI Server] Recognized: {student_id}")
-            return jsonify({
-                "recognized": True,
-                "studentId": student_id,
-                "faceBox": {
-                    "x": int(face_box[0]),
-                    "y": int(face_box[1]),
-                    "w": int(face_box[2]),
-                    "h": int(face_box[3])
-                },
-                "faces": all_faces_list
-            })
-        else:
-            return jsonify({
-                "recognized": False,
-                "faces": all_faces_list
-            })
+        # Backward compatibility / Summary flag
+        any_recognized = any(r["recognized"] for r in results)
+
+        return jsonify({
+            "results": results,
+            "recognized": any_recognized,
+            "count": len(results)
+        })
 
     except Exception as e:
         print(f"[AI Server] Error: {e}")
