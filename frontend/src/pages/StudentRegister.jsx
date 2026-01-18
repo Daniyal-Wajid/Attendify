@@ -424,12 +424,12 @@ export default function StudentRegister() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-800">
-          Student Registration
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border dark:border-gray-700 p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <h1 className="text-3xl font-bold text-center mb-2 text-gray-800 dark:text-white">
+          Attendify - Student Registration
         </h1>
-        <p className="text-center text-gray-600 mb-8">
+        <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
           Register with your details and video
         </p>
 
@@ -447,7 +447,7 @@ export default function StudentRegister() {
                   setForm({ ...form, name: e.target.value });
                   setErrors({ ...errors, name: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.name ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 py-3 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${errors.name ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"
                   }`}
                 placeholder="Enter your full name"
               />
@@ -468,7 +468,7 @@ export default function StudentRegister() {
                   setForm({ ...form, rollNumber: e.target.value });
                   setErrors({ ...errors, rollNumber: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.rollNumber ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 py-3 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${errors.rollNumber ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"
                   }`}
                 placeholder="Enter your roll number"
               />
@@ -490,7 +490,7 @@ export default function StudentRegister() {
                 setForm({ ...form, email: e.target.value });
                 setErrors({ ...errors, email: "" });
               }}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.email ? "border-red-500" : "border-gray-300"
+              className={`w-full px-4 py-3 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${errors.email ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"
                 }`}
               placeholder="Enter your email"
             />
@@ -512,7 +512,7 @@ export default function StudentRegister() {
                   setForm({ ...form, password: e.target.value });
                   setErrors({ ...errors, password: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.password ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 py-3 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${errors.password ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"
                   }`}
                 placeholder="Enter password"
               />
@@ -533,7 +533,7 @@ export default function StudentRegister() {
                   setForm({ ...form, confirmPassword: e.target.value });
                   setErrors({ ...errors, confirmPassword: "" });
                 }}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                className={`w-full px-4 py-3 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${errors.confirmPassword ? "border-red-500 dark:border-red-500" : "border-gray-300 dark:border-gray-600"
                   }`}
                 placeholder="Confirm password"
               />
@@ -577,7 +577,7 @@ export default function StudentRegister() {
                           value={ipUrl}
                           onChange={(e) => setIpUrl(e.target.value)}
                           placeholder="Enter IP Camera URL (e.g., http://.../video)"
-                          className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          className="w-full px-4 py-2 border dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
                         />
                       </div>
                     )}
@@ -648,7 +648,7 @@ export default function StudentRegister() {
           {/* Camera Screen Modal */}
           {showCameraScreen && (
             <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border dark:border-gray-700 max-w-2xl w-full p-6">
                 <div className="relative">
                   {cameraMode === "webcam" ? (
                     <video

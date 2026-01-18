@@ -8,10 +8,10 @@ export default function AdminDashboard() {
     <>
       <Topbar />
 
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-full">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-slate-500">Welcome back, John Admin</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-slate-500 dark:text-gray-400">Welcome back, John Admin</p>
         </div>
 
         <div className="grid grid-cols-4 gap-6">

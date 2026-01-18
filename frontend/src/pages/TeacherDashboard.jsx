@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Webcam from "react-webcam";
 import axios from "axios";
 import { Camera, Globe } from "lucide-react";
+import TeacherSidebar from "../components/TeacherSidebar";
 
 export default function TeacherDashboard() {
   const [user, setUser] = useState(null);
@@ -476,82 +477,53 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-gray-800">Teacher Dashboard</h1>
-            <div className="flex items-center gap-4">
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="px-4 py-2 border rounded-lg"
-              >
-                {subjects.map((subject) => (
-                  <option key={subject._id} value={subject._id}>
-                    {subject.name} ({subject.code})
-                  </option>
-                ))}
-              </select>
-              <span className="text-gray-600">{user?.name || user?.email}</span>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Logout
-              </button>
-            </div>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      <TeacherSidebar 
+        activeTab={activeTab} 
+        onTabChange={(tab) => {
+          if (tab === "attendance" || tab === "enrollments") {
+            loadData();
+          }
+          setActiveTab(tab);
+        }}
+        pendingEnrollmentsCount={enrollments.filter(e => e.status === "pending").length}
+      />
+      
+      <main className="flex-1 overflow-y-auto flex flex-col">
+        {/* Topbar */}
+        <nav className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700 h-16 flex items-center justify-between px-6 sticky top-0 z-10">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Teacher Dashboard</h2>
+          <div className="flex items-center gap-4">
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="px-4 py-2 border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              {subjects.map((subject) => (
+                <option key={subject._id} value={subject._id}>
+                  {subject.name} ({subject.code})
+                </option>
+              ))}
+            </select>
+            <span className="text-gray-600 dark:text-gray-300 text-sm">{user?.name || user?.email}</span>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+            >
+              Logout
+            </button>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200">
-          <nav className="flex gap-4">
-            <button
-              onClick={() => setActiveTab("camera")}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "camera"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-            >
-              Live Camera
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("attendance");
-                loadData(); // Refresh attendance when switching tabs
-              }}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "attendance"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-            >
-              View Attendance
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("enrollments");
-                loadData(); // Refresh enrollments when switching tabs
-              }}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors ${activeTab === "enrollments"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-            >
-              Enrollments ({enrollments.filter(e => e.status === "pending").length})
-            </button>
-          </nav>
-        </div>
+        <div className="p-6">
 
         {activeTab === "camera" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Live Camera Feed */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-xl shadow p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold">Live Camera Feed</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Live Camera Feed</h2>
                   <div className="flex items-center gap-3">
                     {/* Camera Toggles */}
                     <div className="flex bg-gray-100 rounded-lg p-1 mr-4">
@@ -674,35 +646,35 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Recognized Students List */}
-            <div className="bg-white rounded-xl shadow p-6">
-              <h2 className="text-xl font-bold mb-4">Detected Students</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+              <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Detected Students</h2>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {recognizedStudents.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                     No students detected yet
                   </p>
                 ) : (
                   recognizedStudents.map((item, idx) => (
                     <div
                       key={`${item.student._id}-${idx}`}
-                      className="p-3 border rounded-lg bg-green-50 border-green-200"
+                      className="p-3 border dark:border-gray-600 rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                     >
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-semibold text-gray-800">
+                          <p className="font-semibold text-gray-800 dark:text-white">
                             {item.student.name}
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
                             Roll: {item.student.rollNumber}
                           </p>
-                          <p className="text-xs text-green-600 mt-1">
+                          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                             ✓ Auto-marked
                           </p>
                         </div>
                         {settings?.allowManualAttendance && (
                           <button
                             onClick={() => handleManualMark(item.student._id)}
-                            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                           >
                             Mark
                           </button>
@@ -720,9 +692,9 @@ export default function TeacherDashboard() {
           <div className="space-y-6">
             {/* Manual Entry Button */}
             {settings?.allowManualAttendance && subjects.length > 0 && (
-              <div className="bg-white rounded-xl shadow p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold">Manual Attendance Entry</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Manual Attendance Entry</h2>
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowBulkAttendance(true)}
@@ -745,19 +717,19 @@ export default function TeacherDashboard() {
             )}
 
             {subjects.length === 0 ? (
-              <div className="bg-white rounded-xl shadow p-8 text-center">
-                <p className="text-gray-500 text-lg">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-8 text-center">
+                <p className="text-gray-500 dark:text-gray-400 text-lg">
                   No subjects assigned. Please contact admin to assign subjects.
                 </p>
               </div>
             ) : Object.keys(attendance).length === 0 ? (
-              <div className="bg-white rounded-xl shadow p-8 text-center">
-                <p className="text-gray-500 text-lg">No attendance records found</p>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-8 text-center">
+                <p className="text-gray-500 dark:text-gray-400 text-lg">No attendance records found</p>
               </div>
             ) : (
               Object.entries(attendance).map(([subjectName, records]) => (
-                <div key={subjectName} className="bg-white rounded-xl shadow p-6">
-                  <h3 className="text-xl font-bold text-gray-800 mb-4">{subjectName}</h3>
+                <div key={subjectName} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">{subjectName}</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -822,8 +794,8 @@ export default function TeacherDashboard() {
             {/* Manual Entry Modal */}
             {showManualEntry && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                  <h2 className="text-2xl font-bold mb-4">Mark Attendance Manually</h2>
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-md w-full p-6">
+                  <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Mark Attendance Manually</h2>
                   <form
                     onSubmit={async (e) => {
                       e.preventDefault();
@@ -963,8 +935,8 @@ export default function TeacherDashboard() {
             {/* Bulk Attendance Modal */}
             {showBulkAttendance && settings?.allowManualAttendance && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full p-6 my-8">
-                  <h2 className="text-2xl font-bold mb-4">Bulk Mark Attendance</h2>
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-4xl w-full p-6 my-8">
+                  <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Bulk Mark Attendance</h2>
                   <div className="space-y-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">Subject</label>
@@ -1129,37 +1101,37 @@ export default function TeacherDashboard() {
 
         {activeTab === "enrollments" && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Pending Enrollment Requests</h2>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Pending Enrollment Requests</h2>
             {enrollments.filter((e) => e.status === "pending").length === 0 ? (
-              <div className="bg-white rounded-xl shadow p-8 text-center">
-                <p className="text-gray-500 text-lg">No pending enrollment requests</p>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-8 text-center">
+                <p className="text-gray-500 dark:text-gray-400 text-lg">No pending enrollment requests</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {enrollments
                   .filter((e) => e.status === "pending")
                   .map((enrollment) => (
-                    <div key={enrollment._id} className="bg-white rounded-xl shadow p-6">
+                    <div key={enrollment._id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-4 mb-2">
-                            <h3 className="text-xl font-bold text-gray-800">
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-white">
                               {enrollment.student.name}
                             </h3>
-                            <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                            <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full text-xs font-medium">
                               Pending
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 mb-1">
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
                             Roll Number: {enrollment.student.rollNumber}
                           </p>
-                          <p className="text-sm text-gray-600 mb-1">
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
                             Email: {enrollment.student.email}
                           </p>
-                          <p className="text-lg font-semibold text-gray-800 mt-3">
+                          <p className="text-lg font-semibold text-gray-800 dark:text-white mt-3">
                             Course: {enrollment.subject.name} ({enrollment.subject.code})
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Requested: {new Date(enrollment.requestedAt).toLocaleString()}
                           </p>
                         </div>
@@ -1205,7 +1177,7 @@ export default function TeacherDashboard() {
                                 alert(`Failed to approve enrollment: ${err.message || "Please try again"}`);
                               }
                             }}
-                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
                           >
                             Approve
                           </button>
@@ -1250,7 +1222,7 @@ export default function TeacherDashboard() {
                                 alert(`Failed to reject enrollment: ${err.message || "Please try again"}`);
                               }
                             }}
-                            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
                           >
                             Reject
                           </button>
@@ -1262,7 +1234,8 @@ export default function TeacherDashboard() {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

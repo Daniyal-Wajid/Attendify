@@ -1,43 +1,20 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  AlertTriangle,
-  Users,
-  GraduationCap,
   Camera,
-  FileText,
-  Bell,
-  BarChart3,
-  History,
+  ClipboardCheck,
+  UserPlus,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
-export default function Sidebar() {
+export default function TeacherSidebar({ activeTab, onTabChange, pendingEnrollmentsCount = 0 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
 
   const menuItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
-    { icon: AlertTriangle, label: "Violations", path: "/admin/violations" },
-    { icon: Users, label: "Users", path: "/admin/users" },
-    { icon: GraduationCap, label: "Students", path: "/admin/students" },
-    { icon: Camera, label: "Cameras", path: "/admin/cameras" },
-    { icon: FileText, label: "Policy Rules", path: "/admin/policy-rules" },
-    { icon: Bell, label: "Notifications", path: "/admin/notifications" },
-    { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
-    { icon: History, label: "History Logs", path: "/admin/history-logs" },
+    { icon: Camera, label: "Live Camera", tab: "camera" },
+    { icon: ClipboardCheck, label: "View Attendance", tab: "attendance" },
+    { icon: UserPlus, label: "Enrollments", tab: "enrollments", badge: pendingEnrollmentsCount },
   ];
-
-  const handleNavigation = (path) => {
-    navigate(path);
-  };
-
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
 
   return (
     <aside
@@ -72,12 +49,12 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.path);
+          const active = activeTab === item.tab;
           return (
             <button
-              key={item.path}
-              onClick={() => handleNavigation(item.path)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              key={item.tab}
+              onClick={() => onTabChange(item.tab)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative ${
                 active
                   ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-l-4 border-blue-600 dark:border-blue-500"
                   : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -88,7 +65,19 @@ export default function Sidebar() {
                 size={20}
                 className={active ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400"}
               />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && (
+                <>
+                  <span>{item.label}</span>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                      {item.badge}
+                    </span>
+                  )}
+                </>
+              )}
+              {collapsed && item.badge !== undefined && item.badge > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              )}
             </button>
           );
         })}

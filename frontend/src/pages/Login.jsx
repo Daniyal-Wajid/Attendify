@@ -6,6 +6,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const toggleDark = () => {
+    document.documentElement.classList.toggle("dark");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -27,15 +31,10 @@ export default function Login() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // Redirect based on role
-      if (data.user.role === "admin") {
-        navigate("/admin");
-      } else if (data.user.role === "teacher") {
-        navigate("/teacher");
-      } else if (data.user.role === "student") {
-        navigate("/student");
-      }
-    } catch (err) {
+      if (data.user.role === "admin") navigate("/admin");
+      else if (data.user.role === "teacher") navigate("/teacher");
+      else navigate("/student");
+    } catch {
       alert("Login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -43,62 +42,77 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-800">
-          Attendance System
-        </h1>
-        <p className="text-center text-gray-600 mb-8">Sign in to continue</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br 
+      from-indigo-100 to-blue-200 dark:from-gray-900 dark:to-gray-800 p-4">
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              placeholder="Enter your email"
-            />
-          </div>
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 
+        rounded-2xl shadow-2xl p-8 border dark:border-gray-700">
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              placeholder="Enter your password"
-            />
-          </div>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400">
+            Attendify
+          </h1>
+          <button
+            onClick={toggleDark}
+            className="text-sm text-gray-500 dark:text-gray-300 hover:underline"
+          >
+            Toggle Theme
+          </button>
+        </div>
+
+        <p className="text-gray-600 dark:text-gray-400 mb-8">
+          Smart Attendance. Powered by AI.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <input
+            type="email"
+            required
+            placeholder="Email address"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="w-full px-4 py-3 rounded-lg border 
+              bg-gray-50 dark:bg-gray-800 
+              border-gray-300 dark:border-gray-700
+              focus:ring-2 focus:ring-indigo-500 outline-none"
+          />
+
+          <input
+            type="password"
+            required
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className="w-full px-4 py-3 rounded-lg border 
+              bg-gray-50 dark:bg-gray-800 
+              border-gray-300 dark:border-gray-700
+              focus:ring-2 focus:ring-indigo-500 outline-none"
+          />
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 rounded-lg font-semibold text-white
+              bg-indigo-600 hover:bg-indigo-700
+              transition disabled:opacity-50"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-600 mb-2">New student?</p>
+          <p className="text-gray-500 dark:text-gray-400 mb-2">
+            New student?
+          </p>
           <button
             onClick={() => navigate("/register")}
-            className="text-blue-600 hover:text-blue-700 font-medium"
+            className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
           >
-            Register here
+            Create an account
           </button>
         </div>
       </div>
     </div>
   );
 }
-

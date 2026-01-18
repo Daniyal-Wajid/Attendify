@@ -7,11 +7,11 @@ export default function PolicyRules() {
     <>
       <Topbar />
 
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-full">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Policy Rules</h1>
-            <p className="text-slate-500">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Policy Rules</h1>
+            <p className="text-slate-500 dark:text-gray-400">
               Manage violation policies and penalties
             </p>
           </div>

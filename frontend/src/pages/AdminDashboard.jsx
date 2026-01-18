@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AdminSidebarSimple from "../components/AdminSidebarSimple";
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   const [filteredAttendance, setFilteredAttendance] = useState([]);
   const [resettingPassword, setResettingPassword] = useState(null); // {type: "student"|"teacher", id: ""}
   const [newPassword, setNewPassword] = useState("");
+  const [activeSection, setActiveSection] = useState("overview");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -358,45 +360,48 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
-            <div className="flex items-center gap-4">
-              <span className="text-gray-600">{user?.name || user?.email}</span>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                Logout
-              </button>
-            </div>
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+      <AdminSidebarSimple 
+        activeSection={activeSection} 
+        onSectionChange={setActiveSection}
+      />
+      
+      <main className="flex-1 overflow-y-auto flex flex-col">
+        {/* Topbar */}
+        <nav className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700 h-16 flex items-center justify-between px-6 sticky top-0 z-10">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Admin Dashboard</h2>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-600 dark:text-gray-300 text-sm">{user?.name || user?.email}</span>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+            >
+              Logout
+            </button>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow p-6">
-            <p className="text-gray-500 text-sm">Total Students</p>
-            <h2 className="text-4xl font-bold text-gray-800">{students.length}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Total Students</p>
+            <h2 className="text-4xl font-bold text-gray-800 dark:text-white">{students.length}</h2>
           </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <p className="text-gray-500 text-sm">Total Subjects</p>
-            <h2 className="text-4xl font-bold text-gray-800">{subjects.length}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Total Subjects</p>
+            <h2 className="text-4xl font-bold text-gray-800 dark:text-white">{subjects.length}</h2>
           </div>
-          <div className="bg-white rounded-xl shadow p-6">
-            <p className="text-gray-500 text-sm">Manual Attendance</p>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Manual Attendance</p>
             <div className="flex items-center justify-between mt-2">
-              <span className={`text-lg font-semibold ${settings?.allowManualAttendance ? "text-green-600" : "text-gray-400"}`}>
+              <span className={`text-lg font-semibold ${settings?.allowManualAttendance ? "text-green-600 dark:text-green-400" : "text-gray-400 dark:text-gray-500"}`}>
                 {settings?.allowManualAttendance ? "Enabled" : "Disabled"}
               </span>
               <button
                 onClick={toggleManualAttendance}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${settings?.allowManualAttendance
-                    ? "bg-red-100 text-red-700 hover:bg-red-200"
-                    : "bg-green-100 text-green-700 hover:bg-green-200"
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${settings?.allowManualAttendance
+                  ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
+                  : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50"
                   }`}
               >
                 {settings?.allowManualAttendance ? "Disable" : "Enable"}
@@ -408,13 +413,13 @@ export default function AdminDashboard() {
         <div className="flex gap-4 mb-6 flex-wrap">
           <button
             onClick={() => setShowRegisterTeacher(true)}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition-colors"
           >
             Register Teacher
           </button>
           <button
             onClick={() => setShowAddSubject(true)}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
           >
             Add Subject
           </button>
@@ -424,7 +429,7 @@ export default function AdminDashboard() {
               setShowAttendanceManagement(true);
               loadData(); // Refresh attendance when opening
             }}
-            className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
+            className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition-colors"
           >
             Manage Attendance
           </button>
@@ -433,8 +438,8 @@ export default function AdminDashboard() {
         {/* Register Teacher Modal */}
         {showRegisterTeacher && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold mb-4">Register New Teacher</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Register New Teacher</h2>
               <form onSubmit={handleRegisterTeacher} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Name</label>
@@ -501,8 +506,8 @@ export default function AdminDashboard() {
         {/* Add Subject Modal */}
         {showAddSubject && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold mb-4">Add Subject</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Add Subject</h2>
               <form onSubmit={handleAddSubject} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Subject Name</label>
@@ -549,8 +554,8 @@ export default function AdminDashboard() {
         )}
 
         {/* Teachers List */}
-        <div className="bg-white rounded-xl shadow p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Teachers</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Teachers</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -606,16 +611,16 @@ export default function AdminDashboard() {
         </div>
 
         {/* Students List */}
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border dark:border-gray-700 p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Students ({filteredStudents.length})</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Students ({filteredStudents.length})</h2>
             <div className="flex items-center gap-4">
               <input
                 type="text"
                 placeholder="Search by name, roll number, or email..."
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
-                className="px-4 py-2 border rounded-lg w-64"
+                className="px-4 py-2 border dark:border-gray-600 rounded-lg w-64 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -669,8 +674,8 @@ export default function AdminDashboard() {
         {/* Password Reset Modal */}
         {resettingPassword && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
                 Reset {resettingPassword.type === "student" ? "Student" : "Teacher"} Password
               </h2>
               <div className="space-y-4">
@@ -718,8 +723,8 @@ export default function AdminDashboard() {
         {/* Assign Subjects Modal */}
         {showAssignSubjects && selectedTeacher && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-              <h2 className="text-2xl font-bold mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
                 Assign Subjects to {selectedTeacher.name}
               </h2>
               <div className="space-y-3 mb-6">
@@ -775,9 +780,9 @@ export default function AdminDashboard() {
         {/* Attendance Management Modal */}
         {showAttendanceManagement && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-6xl w-full max-h-[90vh] overflow-y-auto p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Attendance Management</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Attendance Management</h2>
                 <button
                   onClick={() => {
                     setShowAttendanceManagement(false);
@@ -851,10 +856,10 @@ export default function AdminDashboard() {
                           <td className="p-2">
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${(record.status || "present") === "present"
-                                  ? "bg-green-100 text-green-700"
-                                  : (record.status || "present") === "absent"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-yellow-100 text-yellow-700"
+                                ? "bg-green-100 text-green-700"
+                                : (record.status || "present") === "absent"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-yellow-100 text-yellow-700"
                                 }`}
                             >
                               {(record.status || "present") === "present" ? "Present" : (record.status || "present") === "absent" ? "Absent" : "Leave"}
@@ -863,8 +868,8 @@ export default function AdminDashboard() {
                           <td className="p-2">
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${record.markedBy === "auto"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-blue-100 text-blue-700"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-blue-100 text-blue-700"
                                 }`}
                             >
                               {record.markedBy === "auto" ? "Auto" : "Manual"}
@@ -933,8 +938,8 @@ export default function AdminDashboard() {
               {/* Edit Attendance Modal */}
               {editingAttendance && (
                 <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                    <h3 className="text-xl font-bold mb-4">Edit Attendance Record</h3>
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border dark:border-gray-700 max-w-md w-full p-6">
+                    <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Attendance Record</h3>
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
@@ -1065,7 +1070,8 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

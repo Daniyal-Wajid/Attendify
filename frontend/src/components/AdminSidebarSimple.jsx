@@ -1,43 +1,24 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  AlertTriangle,
-  Users,
   GraduationCap,
-  Camera,
-  FileText,
-  Bell,
-  BarChart3,
-  History,
+  Users,
+  BookOpen,
+  Settings,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 
-export default function Sidebar() {
+export default function AdminSidebarSimple({ activeSection, onSectionChange }) {
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
 
   const menuItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
-    { icon: AlertTriangle, label: "Violations", path: "/admin/violations" },
-    { icon: Users, label: "Users", path: "/admin/users" },
-    { icon: GraduationCap, label: "Students", path: "/admin/students" },
-    { icon: Camera, label: "Cameras", path: "/admin/cameras" },
-    { icon: FileText, label: "Policy Rules", path: "/admin/policy-rules" },
-    { icon: Bell, label: "Notifications", path: "/admin/notifications" },
-    { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
-    { icon: History, label: "History Logs", path: "/admin/history-logs" },
+    { icon: LayoutDashboard, label: "Dashboard", section: "overview" },
+    { icon: GraduationCap, label: "Students", section: "students" },
+    { icon: Users, label: "Teachers", section: "teachers" },
+    { icon: BookOpen, label: "Subjects", section: "subjects" },
+    { icon: Settings, label: "Settings", section: "settings" },
   ];
-
-  const handleNavigation = (path) => {
-    navigate(path);
-  };
-
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
 
   return (
     <aside
@@ -72,11 +53,11 @@ export default function Sidebar() {
       <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.path);
+          const active = activeSection === item.section;
           return (
             <button
-              key={item.path}
-              onClick={() => handleNavigation(item.path)}
+              key={item.section}
+              onClick={() => onSectionChange(item.section)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 active
                   ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-l-4 border-blue-600 dark:border-blue-500"
