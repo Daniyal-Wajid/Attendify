@@ -18,8 +18,8 @@ venv/
 env/
 .venv/
 pip-wheel-metadata/
-.frames/
-./uploads/
+backend/uploads/
+backend/frames/
 
 # =========================
 # Environment variables

@@ -32,7 +32,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
-    
+
     if (!token || userData.role !== "admin") {
       navigate("/login");
       return;
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
 
   const handleRegisterTeacher = async (e) => {
     e.preventDefault();
-    
+
     // Validate form
     if (!teacherForm.name || !teacherForm.email || !teacherForm.password) {
       alert("Please fill in all fields");
@@ -234,7 +234,7 @@ export default function AdminDashboard() {
       // Read response as text first, then try to parse as JSON
       const responseText = await res.text();
       let data;
-      
+
       try {
         data = JSON.parse(responseText);
       } catch (parseErr) {
@@ -394,11 +394,10 @@ export default function AdminDashboard() {
               </span>
               <button
                 onClick={toggleManualAttendance}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  settings?.allowManualAttendance
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${settings?.allowManualAttendance
                     ? "bg-red-100 text-red-700 hover:bg-red-200"
                     : "bg-green-100 text-green-700 hover:bg-green-200"
-                }`}
+                  }`}
               >
                 {settings?.allowManualAttendance ? "Disable" : "Enable"}
               </button>
@@ -851,24 +850,22 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-2">
                             <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                (record.status || "present") === "present"
+                              className={`px-2 py-1 rounded text-xs font-medium ${(record.status || "present") === "present"
                                   ? "bg-green-100 text-green-700"
                                   : (record.status || "present") === "absent"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-yellow-100 text-yellow-700"
-                              }`}
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"
+                                }`}
                             >
                               {(record.status || "present") === "present" ? "Present" : (record.status || "present") === "absent" ? "Absent" : "Leave"}
                             </span>
                           </td>
                           <td className="p-2">
                             <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                record.markedBy === "auto"
+                              className={`px-2 py-1 rounded text-xs font-medium ${record.markedBy === "auto"
                                   ? "bg-green-100 text-green-700"
                                   : "bg-blue-100 text-blue-700"
-                              }`}
+                                }`}
                             >
                               {record.markedBy === "auto" ? "Auto" : "Manual"}
                             </span>
