@@ -18,6 +18,8 @@ venv/
 env/
 .venv/
 pip-wheel-metadata/
+.frames/
+./uploads/
 
 # =========================
 # Environment variables
@@ -51,3 +53,5 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+
